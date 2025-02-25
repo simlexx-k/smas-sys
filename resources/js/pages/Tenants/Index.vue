@@ -57,7 +57,7 @@
 import AppLayout from '@/layouts/AppLayout.vue';
 import { Link } from '@inertiajs/vue3';
 import Pagination from '@/components/Pagination.vue';
-import TenantViewModal from '@/Components/TenantViewModal.vue';
+import TenantViewModal from '@/components/TenantViewModal.vue';
 import { ref, onMounted } from 'vue';
 
 const props = defineProps({
