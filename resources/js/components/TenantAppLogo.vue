@@ -3,6 +3,7 @@ import AppLogoIcon from '@/components/AppLogoIcon.vue';
 
 interface Props {
     class?: string;
+   
 }
 
 defineProps<Props>();
@@ -14,5 +15,6 @@ defineProps<Props>();
     </div>
     <div class="ml-1 grid flex-1 text-left text-sm">
         <span class="mb-0.5 truncate font-semibold leading-none">Tenant - SMAS Systems</span>
+        
     </div>
 </template>

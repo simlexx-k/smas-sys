@@ -27,10 +27,10 @@
   </Modal>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { ref } from 'vue';
-import Modal from '@/Components/Modal.vue';
-import SecondaryButton from '@/Components/SecondaryButton.vue';
+import Modal from '@/components/Modal.vue';
+import SecondaryButton from '@/components/SecondaryButton.vue';
 
 const props = defineProps({
   tenant: {
