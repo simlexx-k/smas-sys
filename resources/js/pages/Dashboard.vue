@@ -1,8 +1,10 @@
 <script setup lang="ts">
 import AppLayout from '@/layouts/AppLayout.vue';
 import { type BreadcrumbItem } from '@/types';
-import { Head } from '@inertiajs/vue3';
+import { Head, usePage } from '@inertiajs/vue3';
 import PlaceholderPattern from '../components/PlaceholderPattern.vue';
+import TenantAdminComponent1 from '@/components/tenants/TenantAttendanceCharts.vue';
+import TenantAdminComponent2 from '@/components/tenants/TenantAdminComponent2.vue';
 
 const breadcrumbs: BreadcrumbItem[] = [
     {
@@ -13,6 +15,9 @@ const breadcrumbs: BreadcrumbItem[] = [
 
 defineProps<{
     name?: string;
+    user: {
+        role: string;
+    };
 }>();
 </script>
 
@@ -34,6 +39,10 @@ defineProps<{
             </div>
             <div class="relative min-h-[100vh] flex-1 rounded-xl border border-sidebar-border/70 dark:border-sidebar-border md:min-h-min">
                 <PlaceholderPattern />
+            </div>
+            <div v-if="usePage().props.auth.user?.role === 'tenant-admin'">
+                <TenantAdminComponent1 />
+                <TenantAdminComponent2 />
             </div>
         </div>
     </AppLayout>

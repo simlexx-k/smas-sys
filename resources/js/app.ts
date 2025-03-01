@@ -6,6 +6,9 @@ import type { DefineComponent } from 'vue';
 import { createApp, h } from 'vue';
 import { ZiggyVue } from '../../vendor/tightenco/ziggy';
 import { initializeTheme } from './composables/useAppearance';
+import Toast from 'vue-toastification';
+import 'vue-toastification/dist/index.css';
+import VueApexCharts from 'vue3-apexcharts'
 
 // Extend ImportMeta interface for Vite...
 declare module 'vite/client' {
@@ -20,7 +23,7 @@ declare module 'vite/client' {
     }
 }
 
-const appName = import.meta.env.VITE_APP_NAME || 'Laravel';
+const appName = import.meta.env.VITE_APP_NAME || 'SMAS';
 
 createInertiaApp({
     title: (title) => `${title} - ${appName}`,
@@ -29,6 +32,8 @@ createInertiaApp({
         createApp({ render: () => h(App, props) })
             .use(plugin)
             .use(ZiggyVue)
+            .use(Toast)
+            .component('apexchart', VueApexCharts)
             .mount(el);
     },
     progress: {

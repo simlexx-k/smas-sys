@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { Head } from '@inertiajs/vue3';
-import AppLayout from '@/layouts/TenantLayout.vue';
+import AppLayout from '@/layouts/AppLayout.vue';
 import TeacherForm from '@/components/Teachers/TeacherForm.vue';
 import { ref, computed } from 'vue';
 import { Search, Download, PlusCircle, ChevronFirst, ChevronLeft, ChevronRight, ChevronLast, X } from 'lucide-vue-next';

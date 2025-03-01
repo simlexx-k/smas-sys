@@ -1,9 +1,11 @@
 <script setup lang="ts">
-import TenantLayout from '@/layouts/TenantLayout.vue';
+import TenantLayout from '@/layouts/AppLayout.vue';
 import TenantSidebar from '@/components/TenantSidebar.vue';
 import { type BreadcrumbItem } from '@/types';
 import { Head } from '@inertiajs/vue3';
 import VueApexCharts from 'vue3-apexcharts';
+import { router } from '@inertiajs/vue3';
+import { onMounted, computed } from 'vue';
 
 const breadcrumbs: BreadcrumbItem[] = [
     {
@@ -15,6 +17,9 @@ const breadcrumbs: BreadcrumbItem[] = [
 defineProps<{
     tenant: any;
 }>();
+
+const hasTenant = computed(() => !!props.tenant);
+const tenantExists = computed(() => !!props.tenant);
 
 // Chart configurations with improved aesthetics
 const barChartOptions = {
@@ -161,6 +166,16 @@ const pieChartOptions = {
 };
 
 const pieChartSeries = [30, 20, 25, 25];
+
+const checkAuth = () => {
+  if (!route().current('login') && !$page.props.auth.user) {
+    router.visit(route('login', { redirect: route().current() }));
+  }
+};
+
+onMounted(() => {
+  checkAuth();
+});
 </script>
 
 <script lang="ts">
@@ -176,9 +191,15 @@ export default {
 <template>
     <Head title="Tenant Dashboard" />
 
-    <TenantLayout :breadcrumbs="breadcrumbs" :sidebar="TenantSidebar">
-        <div class="flex h-full flex-1 flex-col gap-6 rounded-xl p-6">
-            <h1 class="text-3xl font-bold text-gray-900 dark:text-gray-100">Welcome, {{ tenant.name }}</h1>
+    <AppLayout :breadcrumbs="breadcrumbs" :sidebar="AppSidebar">
+        <div v-if="!tenantExists" class="flex flex-col items-center justify-center gap-4">
+            <p class="text-xl text-gray-900 dark:text-gray-100">Tenant does not exist yet</p>
+            <Link :href="route('tenants.create')" class="rounded-md bg-blue-500 px-4 py-2 text-white hover:bg-blue-600">
+                Sign Up
+            </Link>
+        </div>
+        <div v-else class="flex h-full flex-1 flex-col gap-6 rounded-xl p-6">
+            <h1 v-if="hasTenant" class="text-3xl font-bold text-gray-900 dark:text-gray-100">Welcome, {{ tenant.name }}</h1>
             <div class="grid auto-rows-min gap-6 md:grid-cols-3">
                 <div class="relative aspect-video overflow-hidden rounded-xl border border-gray-200 bg-white shadow-lg dark:border-gray-700 dark:bg-gray-800">
                     <VueApexCharts type="bar" :options="barChartOptions" :series="barChartSeries" />
@@ -210,5 +231,5 @@ export default {
                 </div>
             </div>
         </div>
-    </TenantLayout>
+    </AppLayout>
 </template>

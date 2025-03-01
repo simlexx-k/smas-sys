@@ -50,6 +50,10 @@ const submit = () => {
             <div class="flex flex-col space-y-6">
                 <HeadingSmall title="Profile information" description="Update your name and email address" />
 
+                <div v-if="user.role === 'tenant-admin'" class="p-4 bg-green-50 rounded-lg">
+                    <p class="text-sm text-green-700">You are an admin of this tenant.</p>
+                </div>
+
                 <form @submit.prevent="submit" class="space-y-6">
                     <div class="grid gap-2">
                         <Label for="name">Name</Label>

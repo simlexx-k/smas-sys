@@ -63,6 +63,11 @@ class Tenant extends Model
 
     public function admin()
     {
-        return $this->hasOne(User::class, 'tenant_id')->where('role', 'admin');
+        return $this->hasOne(User::class, 'tenant_id')->where('role', 'tenant-admin');
+    }
+
+    public function classes()
+    {
+        return $this->hasMany(\App\Models\SchoolClass::class);
     }
 }

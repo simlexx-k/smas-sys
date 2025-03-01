@@ -1,5 +1,5 @@
 <template>
-  <TenantLayout :breadcrumbs="breadcrumbs">
+  <AppLayout :breadcrumbs="breadcrumbs">
     <Head title="Academics" />
     <div class="px-4 sm:px-6 lg:px-8 py-8">
       <!-- Page Header -->
@@ -129,11 +129,11 @@
         </nav>
       </div>
     </div>
-  </TenantLayout>
+  </AppLayout>
 </template>
 
 <script setup lang="ts">
-import TenantLayout from '@/layouts/TenantLayout.vue';
+import TenantLayout from '@/layouts/AppLayout.vue';
 import { type BreadcrumbItem } from '@/types';
 import { Head } from '@inertiajs/vue3';
 import { ref } from 'vue';

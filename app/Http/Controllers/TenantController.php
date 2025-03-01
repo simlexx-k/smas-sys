@@ -10,9 +10,12 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\Rule;
 use Inertia\Inertia;
+use App\Traits\TenantBindable;
 
 class TenantController extends Controller
 {
+    use TenantBindable;
+
     public function index()
     {
         $tenants = Tenant::with('admin')->paginate(10)->append('hashed_id');
@@ -47,7 +50,7 @@ class TenantController extends Controller
             'email' => $validated['admin_email'],
             'password' => Hash::make($validated['admin_password']),
             'tenant_id' => $tenant->id,
-            'role' => 'admin',
+            'role' => 'tenant-admin',
         ]);
 
         return redirect()->route('tenants.index');
@@ -121,7 +124,13 @@ class TenantController extends Controller
 
     public function dashboard()
     {
-        $tenant = Tenant::current();
+        $user = auth()->user();
+        
+        if (!$user || $user->role !== 'tenant-admin') {
+            return response()->json(['error' => 'Unauthorized'], 401);
+        }
+
+        $tenant = $user->tenant;
 
         if (!$tenant) {
             return response()->json(['error' => 'Tenant not found'], 404);
@@ -134,10 +143,12 @@ class TenantController extends Controller
 
     public function students()
     {
-        $tenant = Tenant::current();
+        $tenant = app('currentTenant');
 
         if (!$tenant) {
-            return response()->json(['error' => 'Tenant not found'], 404);
+            return Inertia::render('Error', [
+                'error' => 'Tenant not found',
+            ]);
         }
 
         return Inertia::render('Tenants/Students', [
@@ -147,7 +158,7 @@ class TenantController extends Controller
 
     public function teachers()
     {
-        $tenant = Tenant::current();
+        $tenant = app('currentTenant');
 
         if (!$tenant) {
             return response()->json(['error' => 'Tenant not found'], 404);
@@ -173,14 +184,63 @@ class TenantController extends Controller
 
     public function classes()
     {
-        $tenant = Tenant::current();
+        Log::info('[Classes] Request received');
+        $tenant = app('currentTenant');
+
+        if (!$tenant) {
+            Log::error('[Classes] Tenant not found');
+            return response()->json(['error' => 'Tenant not found'], 404);
+        }
+
+        Log::info('[Classes] Fetching classes for tenant:', ['tenant_id' => $tenant->id]);
+        $classes = $tenant->classes()->paginate(10);
+
+        return Inertia::render('Tenants/Classes', [
+            'classes' => $classes
+        ]);
+    }
+
+    public function attendance()
+    {
+        $tenant = app('currentTenant');
 
         if (!$tenant) {
             return response()->json(['error' => 'Tenant not found'], 404);
         }
 
-        return Inertia::render('Tenants/Classes', [
+        return Inertia::render('Tenants/Attendance', [
             'tenant' => $tenant,
         ]);
+    }
+
+    public function adminRedirect()
+    {
+        $user = auth()->user();
+
+        if ($user && $user->role === 'tenant-admin') {
+            $tenant = $user->tenant;
+            if ($tenant) {
+                return redirect()->to('http://' . $tenant->domain . '.' . config('app.domain') . '/dashboard');
+            }
+        }
+
+        return redirect('/');
+    }
+
+    public function getTenantsForAdmin(Request $request)
+    {
+        $user = $request->user();
+
+        if ($user->role !== 'tenant-admin') {
+            return response()->json(['tenants' => []]);
+        }
+
+        $tenants = Tenant::whereHas('admin', function ($query) use ($user) {
+            $query->where('id', $user->id);
+        })->get();
+
+        \Log::info('Tenants data:', $tenants->toArray());
+
+        return response()->json(['tenants' => $tenants]);
     }
 }

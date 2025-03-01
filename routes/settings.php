@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Settings\PasswordController;
 use App\Http\Controllers\Settings\ProfileController;
+use App\Http\Controllers\TenantController; 
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
 
@@ -18,4 +19,11 @@ Route::middleware('auth')->group(function () {
     Route::get('settings/appearance', function () {
         return Inertia::render('settings/Appearance');
     })->name('appearance');
+
+    Route::get('settings/tenant-management', function () {
+        return Inertia::render('settings/TenantManagement');
+    })->name('tenant-management');
+
+    Route::get('settings/tenant-management/tenants', [TenantController::class, 'getTenantsForAdmin'])->name('tenant-management.tenants');
+    Route::get('settings/tenant-management/tenants-for-admin', [TenantController::class, 'getTenantsForAdmin'])->name('tenant-management.tenants-for-admin');
 });
