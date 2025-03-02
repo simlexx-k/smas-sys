@@ -7,9 +7,15 @@ use Illuminate\Http\Request;
 
 class ExamController extends Controller
 {
-    public function index()
+    public function index(Request $request)
     {
-        return Exam::all();
+        $query = Exam::query();
+
+        if ($request->has('tenant_id')) {
+            $query->where('tenant_id', $request->query('tenant_id'));
+        }
+
+        return $query->get();
     }
 
     public function store(Request $request)

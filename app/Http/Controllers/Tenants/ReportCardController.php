@@ -156,7 +156,8 @@ class ReportCardController extends Controller
     private function generatePdf($reportCard)
     {
         $data = $this->sanitizer->sanitize([
-            'student' => $reportCard->student->name,
+            'student' => $reportCard->student->full_name,
+            'class' => $reportCard->student->schoolClass->name,
             'exam' => $reportCard->exam->name,
             'subject' => $reportCard->subject->name,
             'score' => $reportCard->score,

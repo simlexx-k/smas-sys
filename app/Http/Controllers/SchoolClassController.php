@@ -7,9 +7,16 @@ use Illuminate\Http\Request;
 
 class SchoolClassController extends Controller
 {
-    public function index()
+    public function index(Request $request)
     {
-        $classes = SchoolClass::with('teacher', 'students')->paginate(10);
+        $tenantId = $request->query('tenant_id');
+        if (!$tenantId) {
+            return response()->json(['error' => 'Tenant ID is required'], 400);
+        }
+
+        $classes = SchoolClass::where('tenant_id', $tenantId)
+            ->with('teacher', 'students')
+            ->paginate(10);
         return response()->json($classes);
     }
 

@@ -263,13 +263,19 @@ const fetchClasses = async () => {
   try {
     loading.value = true;
     error.value = null;
-    const response = await api.get('/classes');
+    const tenantId = user.value?.tenant_id;
+    if (!tenantId) {
+      throw new Error('Tenant ID is missing');
+    }
+    const response = await api.get('/classes', {
+      params: { tenant_id: tenantId }
+    });
     classes.value = response.data.data.map((item: any) => ({
       id: item.id,
       name: item.name,
     }));
   } catch (err) {
-    error.value = 'Failed to fetch classes. Please try again.';
+    error.value = err.message || 'Failed to fetch classes. Please try again.';
   } finally {
     loading.value = false;
   }

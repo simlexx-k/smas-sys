@@ -341,12 +341,7 @@ const currentPage = ref(1);
 
 // Computed properties for filtered and paginated data
 const filteredExams = computed(() => {
-  return exams.value.filter(exam => {
-    const matchesSearch = exam.name.toLowerCase().includes(searchQuery.value.toLowerCase()) ||
-                         exam.subject?.name.toLowerCase().includes(searchQuery.value.toLowerCase());
-    const matchesSubject = selectedSubject.value === 'All' || exam.subject_id === selectedSubject.value;
-    return matchesSearch && matchesSubject;
-  });
+  return exams.value || [];
 });
 
 const paginatedExams = computed(() => {
@@ -424,14 +419,13 @@ const fetchSubjects = async () => {
 
 const fetchExams = async () => {
   try {
-    loading.value = true;
-    error.value = null;
-    const response = await axios.get('/api/exams');
+    const response = await axios.get('/api/exams', {
+      params: { tenant_id: tenantId }
+    });
     exams.value = response.data;
   } catch (err) {
     error.value = 'Failed to fetch exams';
-  } finally {
-    loading.value = false;
+    console.error(err);
   }
 };
 

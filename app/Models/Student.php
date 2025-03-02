@@ -22,6 +22,11 @@ class Student extends Model
         'email',
     ];
 
+    public function getFullNameAttribute()
+    {
+        return trim($this->first_name . ' ' . $this->last_name);
+    }
+
     public function tenant()
     {
         return $this->belongsTo(Tenant::class);

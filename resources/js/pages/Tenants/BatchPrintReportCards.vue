@@ -30,7 +30,7 @@
             <div class="flex items-center gap-3">
               <div class="flex-1">
                 <h3 class="font-medium text-gray-900">{{ classItem.name }}</h3>
-                <p class="text-sm text-gray-500">{{ classItem.student_count }} students</p>
+                <p class="text-sm text-gray-500">{{ classItem.student_count }} student(s)</p>
               </div>
               <svg v-if="selectedClass === classItem.id" class="w-5 h-5 text-primary-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
@@ -181,11 +181,18 @@ async function fetchClasses() {
       params: { tenant_id: tenantId }
     });
 
+    console.log('API Response:', response.data);
+
     // Validate response data
     if (response.data && Array.isArray(response.data.data)) {
-      classes.value = response.data.data.filter(classItem => 
-        classItem && classItem.id && typeof classItem.id === 'number'
-      );
+      classes.value = response.data.data.filter(classItem => {
+        console.log('Class Item:', classItem);
+        if (classItem && classItem.id && typeof classItem.id === 'number') {
+          classItem.student_count = classItem.students?.length || 0;
+          return true;
+        }
+        return false;
+      });
     } else {
       throw new Error('Invalid response format from API');
     }
