@@ -5,6 +5,7 @@ namespace App\Http\Middleware;
 use Closure;
 use Illuminate\Http\Request;
 use App\Models\Tenant;
+use App\Models\User;
 use Illuminate\Support\Facades\Auth;
 use Inertia\Inertia;
 use Illuminate\Support\Facades\Log;
@@ -14,19 +15,19 @@ class IdentifyTenant
 {
     public function handle(Request $request, Closure $next)
     {
-        // Only check tenant for authenticated users
+        // Skip tenant identification for landlords
+        if (Auth::check() && Auth::user()->hasRole(User::ROLE_LANDLORD)) {
+            return $next($request);
+        }
+
+        // Proceed with tenant identification for other roles
         if (Auth::check()) {
             $tenantId = session('tenant_id') ?? Auth::user()->tenant_id;
-
-            \Log::info('Tenant ID:', ['tenantId' => $tenantId]);
 
             if ($tenantId) {
                 $tenant = Tenant::find($tenantId);
                 
-                \Log::info('Tenant found:', ['tenant' => $tenant]);
-
                 if ($tenant) {
-                    // Set tenant in application context
                     app()->instance('currentTenant', $tenant);
                 } else {
                     return Inertia::render('Error', [

@@ -1,5 +1,5 @@
 <template>
-  <TransitionRoot appear :show="show" as="template">
+  <TransitionRoot appear :show="modelValue" as="template">
     <Dialog as="div" @close="close" class="relative z-10">
       <TransitionChild
         as="template"
@@ -45,15 +45,15 @@ import {
 } from '@headlessui/vue';
 
 const props = defineProps({
-  show: {
+  modelValue: {
     type: Boolean,
     default: false,
   },
 });
 
-const emit = defineEmits(['close']);
+const emit = defineEmits(['update:modelValue']);
 
 const close = () => {
-  emit('close');
+  emit('update:modelValue', false);
 };
 </script>

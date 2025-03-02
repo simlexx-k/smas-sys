@@ -47,6 +47,21 @@ const mainNavItems: NavItem[] = [
             href: '/attendance',
             icon: SchoolIcon,
         },
+        {
+            title: 'Subjects',
+            href: '/subjects',
+            icon: PlusIcon,
+        },
+        {
+            title: 'Exams',
+            href: '/exams',
+            icon: PlusIcon,
+        },
+        {
+            title: 'Report Cards',
+            href: '/report-cards',
+            icon: PlusIcon,
+        }
     ] : [
         {
             title: 'Tenants',
@@ -58,6 +73,7 @@ const mainNavItems: NavItem[] = [
             href: '/tenants/create',
             icon: PlusIcon,
         },
+
     ]),
 ];
 
