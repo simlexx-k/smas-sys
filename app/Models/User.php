@@ -61,4 +61,18 @@ class User extends Authenticatable
     {
         return $this->belongsTo(Tenant::class);
     }
+
+    /**
+     * Boot function from Laravel.
+     */
+    protected static function boot()
+    {
+        parent::boot();
+
+        static::creating(function ($user) {
+            if (!$user->role) {
+                $user->role = self::ROLE_LANDLORD;
+            }
+        });
+    }
 }
