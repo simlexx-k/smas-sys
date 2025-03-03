@@ -14,10 +14,17 @@ class SchoolClassController extends Controller
             return response()->json(['error' => 'Tenant ID is required'], 400);
         }
 
-        $classes = SchoolClass::where('tenant_id', $tenantId)
-            ->with('teacher', 'students')
-            ->paginate(10);
-        return response()->json($classes);
+        $query = SchoolClass::where('tenant_id', $tenantId)
+            ->select('id', 'name')  // Only select needed fields
+            ->orderBy('name');
+
+        // If pagination is requested
+        if ($request->query('paginate', true)) {
+            return response()->json($query->paginate(10));
+        }
+
+        // Return all results without pagination
+        return response()->json($query->get());
     }
 
     public function store(Request $request)

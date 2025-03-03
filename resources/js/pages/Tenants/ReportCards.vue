@@ -15,6 +15,48 @@
           </div>
         </div>
   
+        <!-- Filters Section -->
+        <div class="bg-white p-4 rounded-xl shadow-sm border border-gray-200">
+          <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-1">Class</label>
+              <select v-model="filters.class_id" class="form-select w-full rounded-md">
+                <option value="">All Classes</option>
+                <option v-for="schoolClass in classes" :key="schoolClass.id" :value="schoolClass.id">
+                  {{ schoolClass.name }}
+                </option>
+              </select>
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-1">Student</label>
+              <select v-model="filters.student_id" class="form-select w-full rounded-md">
+                <option value="">All Students</option>
+                <option v-for="student in filteredStudents" :key="student.id" :value="student.id">
+                  {{ student.full_name }}
+                </option>
+              </select>
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-1">Exam</label>
+              <select v-model="filters.exam_id" class="form-select w-full rounded-md">
+                <option value="">All Exams</option>
+                <option v-for="exam in exams" :key="exam.id" :value="exam.id">
+                  {{ exam.name }}
+                </option>
+              </select>
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-1">Subject</label>
+              <select v-model="filters.subject_id" class="form-select w-full rounded-md">
+                <option value="">All Subjects</option>
+                <option v-for="subject in subjects" :key="subject.id" :value="subject.id">
+                  {{ subject.name }}
+                </option>
+              </select>
+            </div>
+          </div>
+        </div>
+  
         <!-- Table Section -->
         <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
           <div class="overflow-x-auto">
@@ -31,10 +73,10 @@
                 </tr>
               </thead>
               <tbody class="bg-white divide-y divide-gray-200">
-                <tr v-for="reportCard in reportCards" :key="reportCard.id">
-                  <td class="px-6 py-4 whitespace-nowrap">{{ getStudentName(reportCard.student_id) }}</td>
-                  <td class="px-6 py-4 whitespace-nowrap">{{ reportCard.exam_id }}</td>
-                  <td class="px-6 py-4 whitespace-nowrap">{{ reportCard.subject_id }}</td>
+                <tr v-for="reportCard in filteredReportCards" :key="reportCard.id">
+                  <td class="px-6 py-4 whitespace-nowrap">{{ reportCard.student?.full_name }}</td>
+                  <td class="px-6 py-4 whitespace-nowrap">{{ reportCard.exam?.name }}</td>
+                  <td class="px-6 py-4 whitespace-nowrap">{{ reportCard.subject?.name }}</td>
                   <td class="px-6 py-4 whitespace-nowrap">{{ reportCard.score }}</td>
                   <td class="px-6 py-4 whitespace-nowrap">{{ reportCard.grade }}</td>
                   <td class="px-6 py-4 whitespace-nowrap">{{ reportCard.remarks }}</td>
@@ -111,7 +153,7 @@
   </template>
   
   <script setup lang="ts">
-  import { ref } from 'vue';
+  import { ref, computed, watch } from 'vue';
   import { Head, Link } from '@inertiajs/vue3';
   import AppLayout from '@/layouts/AppLayout.vue';
   import axios from 'axios';
@@ -126,11 +168,15 @@
     grade: string;
     remarks: string;
     tenant_id: number | null;
+    student?: { full_name: string };
+    exam?: { name: string };
+    subject?: { name: string };
   }
   
   interface Student {
     id: number;
     name: string;
+    school_class_id: number;
   }
   
   interface Exam {
@@ -139,6 +185,11 @@
   }
   
   interface Subject {
+    id: number;
+    name: string;
+  }
+  
+  interface SchoolClass {
     id: number;
     name: string;
   }
@@ -160,6 +211,7 @@
   const students = ref<Student[]>([]);
   const exams = ref<Exam[]>([]);
   const subjects = ref<Subject[]>([]);
+  const classes = ref<SchoolClass[]>([]);
   
   const breadcrumbs = [
     {
@@ -168,9 +220,53 @@
     },
   ];
   
+  // Add filters ref
+  const filters = ref({
+    student_id: '',
+    exam_id: '',
+    subject_id: '',
+    class_id: ''
+  });
+  
+  // Add computed property for filtered report cards
+  const filteredReportCards = computed(() => {
+    return reportCards.value.filter(card => {
+      if (filters.value.student_id && card.student_id !== filters.value.student_id) return false;
+      if (filters.value.exam_id && card.exam_id !== filters.value.exam_id) return false;
+      if (filters.value.subject_id && card.subject_id !== filters.value.subject_id) return false;
+      return true;
+    });
+  });
+  
+  // Add computed property for filtered students
+  const filteredStudents = computed(() => {
+    if (!filters.value.class_id) return students.value;
+    return students.value.filter(student => student.school_class_id === filters.value.class_id);
+  });
+  
+  // Add watch to refresh data when filters change
+  watch(filters, () => {
+    fetchReportCards();
+  }, { deep: true });
+  
+  // Add watch for class_id to reset student_id when class changes
+  watch(() => filters.value.class_id, () => {
+    filters.value.student_id = '';
+  });
+  
+  const page = usePage();
+  const tenantId = computed(() => page.props.tenant?.id);
+  
   async function fetchReportCards() {
     try {
-      const response = await axios.get('/api/report-cards');
+      const params = {
+        student_id: filters.value.student_id,
+        exam_id: filters.value.exam_id,
+        subject_id: filters.value.subject_id,
+        class_id: filters.value.class_id,
+        tenant_id: tenantId.value
+      };
+      const response = await axios.get('/api/report-cards', { params });
       reportCards.value = response.data;
     } catch (error) {
       console.error('Error fetching report cards:', error);
@@ -179,8 +275,18 @@
   
   async function fetchStudents() {
     try {
-      const response = await axios.get('/api/students');
-      students.value = response.data;
+      const response = await axios.get('/api/students', {
+        params: {
+          tenant_id: tenantId.value,
+          paginate: false
+        }
+      });
+      if (response.data.data) {
+        students.value = response.data.data;
+      } else {
+        students.value = response.data;
+      }
+      console.log('Students loaded:', students.value);
     } catch (error) {
       console.error('Error fetching students:', error);
     }
@@ -188,8 +294,17 @@
   
   async function fetchExams() {
     try {
-      const response = await axios.get('/api/exams');
-      exams.value = response.data;
+      const response = await axios.get('/api/exams', {
+        params: {
+          tenant_id: tenantId.value,
+          paginate: false
+        }
+      });
+      if (response.data.data) {
+        exams.value = response.data.data;
+      } else {
+        exams.value = response.data;
+      }
     } catch (error) {
       console.error('Error fetching exams:', error);
     }
@@ -197,10 +312,42 @@
   
   async function fetchSubjects() {
     try {
-      const response = await axios.get('/api/subjects');
-      subjects.value = response.data;
+      const response = await axios.get('/api/subjects', {
+        params: {
+          tenant_id: tenantId.value,
+          paginate: false
+        }
+      });
+      if (response.data.data) {
+        subjects.value = response.data.data;
+      } else {
+        subjects.value = response.data;
+      }
     } catch (error) {
       console.error('Error fetching subjects:', error);
+    }
+  }
+  
+  async function fetchClasses() {
+    try {
+      if (!tenantId.value) {
+        console.error('No tenant ID available');
+        return;
+      }
+
+      const response = await axios.get('/api/classes', {
+        params: {
+          tenant_id: tenantId.value,
+          paginate: false
+        }
+      });
+      if (response.data.data) {
+        classes.value = response.data.data;
+      } else {
+        classes.value = response.data;
+      }
+    } catch (error) {
+      console.error('Error fetching classes:', error);
     }
   }
   
@@ -218,7 +365,7 @@
   
   async function saveReportCard() {
     try {
-      const payload = { ...currentReportCard.value, tenant_id: usePage().props.tenant.id };
+      const payload = { ...currentReportCard.value, tenant_id: tenantId.value };
       if (isEditing.value) {
         await axios.put(`/api/report-cards/${currentReportCard.value.id}`, payload);
       } else {
@@ -282,11 +429,12 @@
     }
   };
   
-  console.log('Tenant ID:', usePage().props.tenant.id);
+  console.log('Tenant ID on load:', usePage().props.tenant.id);
   fetchReportCards();
   fetchStudents();
   fetchExams();
   fetchSubjects();
+  fetchClasses();
   </script>
   
   <style scoped>
@@ -298,5 +446,8 @@
   }
   .btn-danger {
     @apply bg-red-600 text-white px-4 py-2 rounded-md hover:bg-red-700;
+  }
+  .form-select {
+    @apply block w-full px-3 py-2 text-base border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md;
   }
   </style>

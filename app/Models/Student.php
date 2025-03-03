@@ -22,9 +22,11 @@ class Student extends Model
         'email',
     ];
 
+    protected $appends = ['full_name'];
+
     public function getFullNameAttribute()
     {
-        return trim($this->first_name . ' ' . $this->last_name);
+        return "{$this->first_name} {$this->last_name}";
     }
 
     public function tenant()

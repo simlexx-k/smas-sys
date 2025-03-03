@@ -22,9 +22,38 @@ class ReportCardController extends Controller
         $this->sanitizer = $sanitizer;
     }
 
-    public function index()
+    public function index(Request $request)
     {
-        $reportCards = ReportCard::with(['student', 'exam', 'subject'])->get();
+        $query = ReportCard::with([
+            'student' => function($query) {
+                $query->select('id', 'first_name', 'last_name', 'school_class_id');
+            },
+            'exam' => function($query) {
+                $query->select('id', 'name');
+            },
+            'subject' => function($query) {
+                $query->select('id', 'name');
+            }
+        ])->where('tenant_id', $request->tenant_id);
+
+        // Apply filters
+        if ($request->has('student_id') && $request->student_id) {
+            $query->where('student_id', $request->student_id);
+        }
+        if ($request->has('exam_id') && $request->exam_id) {
+            $query->where('exam_id', $request->exam_id);
+        }
+        if ($request->has('subject_id') && $request->subject_id) {
+            $query->where('subject_id', $request->subject_id);
+        }
+        if ($request->has('class_id') && $request->class_id) {
+            $query->whereHas('student', function($query) use ($request) {
+                $query->where('school_class_id', $request->class_id);
+            });
+        }
+
+        $reportCards = $query->get();
+        
         return response()->json($reportCards);
     }
 
