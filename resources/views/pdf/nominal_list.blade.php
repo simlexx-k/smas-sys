@@ -93,6 +93,8 @@
             max-width: 200px;
             overflow: hidden;
             text-overflow: ellipsis;
+            text-transform: uppercase;
+            /* font-weight: 500; */
         }
 
         .total-column {
@@ -115,16 +117,12 @@
         .subject-legend h4 {
             margin-bottom: 10px;
             font-size: 12px;
+            font-weight: bold;
         }
 
-        .legend-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
-            gap: 8px;
-            font-size: 10px;
-        }
-
-        .legend-item {
+        .legend-table td {
+            font-size: 11px;
+            vertical-align: top;
             white-space: nowrap;
             overflow: hidden;
             text-overflow: ellipsis;
@@ -189,7 +187,7 @@
             @foreach($sortedStudents as $student)
                 <tr>
                     <td class="rank-column">{{ $positions[$student->id] ?? '-' }}</td>
-                    <td class="student-name">{{ $student->full_name }}</td>
+                    <td class="student-name">{{ strtoupper($student->full_name) }}</td>
                     @foreach($subjects as $subject)
                         @php
                             $score = $scores[$student->id][$subject->id] ?? '-';
@@ -206,13 +204,54 @@
 
     <div class="subject-legend">
         <h4>Subject Legend:</h4>
-        <div class="legend-grid">
-            @foreach($subjects as $subject)
-                <div class="legend-item">
-                    <strong>{{ $subject->code }}</strong>: {{ $subject->name }}
-                </div>
-            @endforeach
-        </div>
+        <table class="legend-table" style="width: 100%; border-collapse: collapse; margin-top: 10px;">
+            <tr>
+                @foreach($subjects->chunk(4) as $subjectChunk)
+                    @foreach($subjectChunk as $subject)
+                        <td style="border: 1px solid #ddd; padding: 5px; width: 25%;">
+                            <strong>{{ $subject->code }}</strong>: {{ $subject->name }}
+                        </td>
+                    @endforeach
+                    @if($subjectChunk->count() < 4)
+                        @for($i = 0; $i < 4 - $subjectChunk->count(); $i++)
+                            <td style="border: 1px solid #ddd; padding: 5px; width: 25%;"></td>
+                        @endfor
+                    @endif
+                </tr><tr>
+                @endforeach
+            </tr>
+        </table>
+    </div>
+
+    <div class="grade-key" style="margin-top: 20px; padding: 10px; border: 1px solid #ddd;">
+        <h4 style="margin-bottom: 10px; font-weight: bold;">Grade Descriptors:</h4>
+        <table style="width: 100%; border-collapse: collapse; font-size: 11px;">
+            <tr>
+                <th style="border: 1px solid #ddd; padding: 5px; text-align: left;">Grade</th>
+                <th style="border: 1px solid #ddd; padding: 5px; text-align: left;">Description</th>
+                <th style="border: 1px solid #ddd; padding: 5px; text-align: left;">Marks Range</th>
+            </tr>
+            <tr>
+                <td style="border: 1px solid #ddd; padding: 5px;">EE</td>
+                <td style="border: 1px solid #ddd; padding: 5px;">Exceeding Expectation</td>
+                <td style="border: 1px solid #ddd; padding: 5px;">76-100</td>
+            </tr>
+            <tr>
+                <td style="border: 1px solid #ddd; padding: 5px;">ME</td>
+                <td style="border: 1px solid #ddd; padding: 5px;">Meeting Expectation</td>
+                <td style="border: 1px solid #ddd; padding: 5px;">51-75</td>
+            </tr>
+            <tr>
+                <td style="border: 1px solid #ddd; padding: 5px;">AE</td>
+                <td style="border: 1px solid #ddd; padding: 5px;">Approaching Expectation</td>
+                <td style="border: 1px solid #ddd; padding: 5px;">26-50</td>
+            </tr>
+            <tr>
+                <td style="border: 1px solid #ddd; padding: 5px;">BE</td>
+                <td style="border: 1px solid #ddd; padding: 5px;">Below Expectation</td>
+                <td style="border: 1px solid #ddd; padding: 5px;">0-25</td>
+            </tr>
+        </table>
     </div>
 
     <div class="footer">

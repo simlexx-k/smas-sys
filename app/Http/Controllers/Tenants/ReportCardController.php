@@ -251,48 +251,48 @@ class ReportCardController extends Controller
 
     private function generatePdf($reportCard)
     {
-        \Log::info('Starting report card generation...');
-        
-        // Get all report cards for this student and exam to show all subjects
+        Log::info('Starting report card generation...');
+
+        // Get all subject scores for this student and exam
         $allSubjectScores = ReportCard::where('student_id', $reportCard->student_id)
             ->where('exam_id', $reportCard->exam_id)
-            ->with(['subject'])
+            ->with(['subject', 'student.class', 'exam', 'tenant'])
             ->get();
 
-        \Log::info('All subject scores:', [
+        Log::info('All subject scores:', [
             'student_id' => $reportCard->student_id,
             'exam_id' => $reportCard->exam_id,
             'scores_count' => $allSubjectScores->count(),
-            'scores' => $allSubjectScores->map(fn($rc) => [
-                'subject' => $rc->subject->name,
-                'score' => $rc->score,
-                'grade' => $rc->grade
-            ])
+            'scores' => ['Illuminate\Support\Collection' => $allSubjectScores->map(function($score) {
+                return [
+                    'subject' => $score->subject->name,
+                    'score' => number_format($score->score, 2),
+                    'grade' => $score->grade
+                ];
+            })]
         ]);
 
+        // Process subjects with auto-generated remarks
+        $subjects = $allSubjectScores->map(function($score) {
+            $scoreValue = floatval($score->score);
+            return [
+                'name' => $score->subject->name,
+                'score' => number_format($scoreValue, 2),
+                'grade' => $this->calculateGrade($scoreValue),
+                'remarks' => $this->generateRemarks($scoreValue) // Use auto-generated remarks
+            ];
+        })->toArray();
+
+        // Calculate summary
+        $total_score = $allSubjectScores->sum('score');
+        $total_subjects = $allSubjectScores->count();
+        $average_score = $total_subjects > 0 ? round($total_score / $total_subjects, 2) : 0;
+
         // Get student details
-        $student = $reportCard->student;
-        if (!$student) {
-            \Log::error('No student found for report card');
-            abort(404, 'Student not found');
-        }
-
-        // Get class with null checks
-        $class = SchoolClass::find($student->school_class_id);
-        if (!$class) {
-            \Log::error('No class found for student', [
-                'student_id' => $student->id,
-                'school_class_id' => $student->school_class_id,
-                'student' => $student->toArray()
-            ]);
-            abort(404, 'Class not found');
-        }
-
-        // Prepare student details with null coalescing
         $student_details = [
-            'name' => $student->full_name ?? $student->first_name . ' ' . $student->last_name,
-            'admission_number' => $student->admission_number ?? 'N/A',
-            'class' => $class->name ?? 'N/A',
+            'name' => $reportCard->student->full_name ?? $reportCard->student->first_name . ' ' . $reportCard->student->last_name,
+            'admission_number' => $reportCard->student->admission_number ?? 'N/A',
+            'class' => $reportCard->student->class->name ?? 'N/A',
             'school_name' => $reportCard->tenant->name ?? 'N/A',
             'school_address' => $reportCard->tenant->address ?? '',
             'school_phone' => $reportCard->tenant->phone ?? '',
@@ -300,129 +300,43 @@ class ReportCardController extends Controller
             'school_logo' => $reportCard->tenant->logo_url ?? null
         ];
 
-        // Get exam details with null checks
+        // Get exam details
         $exam_details = [
             'name' => $reportCard->exam->name ?? 'N/A',
             'term' => $reportCard->exam->term ?? 'N/A',
             'year' => $reportCard->exam->year ?? date('Y')
         ];
 
-        // Map all subjects and their scores
-        $subjects = $allSubjectScores->map(function($rc) {
-            return [
-                'name' => $rc->subject->name,
-                'score' => number_format($rc->score, 2),
-                'grade' => $rc->grade,
-                'remarks' => $rc->remarks ?? ''
-            ];
-        })->values()->toArray();
-
-        \Log::info('Processed subjects:', ['subjects' => $subjects]);
-
-        // Calculate summary with all subjects
-        $total_score = $allSubjectScores->sum('score');
-        $total_subjects = $allSubjectScores->count();
-        $average_score = $total_subjects > 0 ? round($total_score / $total_subjects, 2) : 0;
-
-        // Calculate overall grade based on average
-        $overall_grade = $this->calculateOverallGrade($average_score);
-
-        // Get all students' scores in the class for this exam to calculate rank
-        $classRankings = ReportCard::select('student_id')
-            ->where('exam_id', $reportCard->exam_id)
-            ->whereIn('student_id', function($query) use ($student) {
-                $query->select('id')
-                      ->from('students')
-                      ->where('school_class_id', $student->school_class_id);
+        // Calculate rank
+        $class_rankings = ReportCard::where('exam_id', $reportCard->exam_id)
+            ->whereHas('student', function($query) use ($reportCard) {
+                $query->where('school_class_id', $reportCard->student->school_class_id);
             })
+            ->select('student_id', DB::raw('AVG(score) as average'))
             ->groupBy('student_id')
-            ->get()
-            ->map(function($rc) use ($reportCard) {
-                // Get average score for each student
-                $studentScores = ReportCard::where('student_id', $rc->student_id)
-                    ->where('exam_id', $reportCard->exam_id)
-                    ->get();
-                
-                return [
-                    'student_id' => $rc->student_id,
-                    'average' => $studentScores->average('score')
-                ];
-            })
-            ->sortByDesc('average')
-            ->values();
+            ->orderByDesc('average')
+            ->get();
 
-        // Find current student's rank
-        $studentRank = $classRankings->search(function($item) use ($reportCard) {
-            return $item['student_id'] === $reportCard->student_id;
-        });
+        $student_rank = $class_rankings->search(function($item) use ($reportCard) {
+            return $item->student_id === $reportCard->student_id;
+        }) + 1;
 
-        $totalStudents = $classRankings->count();
-
-        // Update summary with calculated rank
         $summary = [
             'total_score' => $total_score,
             'total_subjects' => $total_subjects,
             'average_score' => $average_score,
-            'overall_grade' => $overall_grade,
-            'rank' => ($studentRank !== false) ? ($studentRank + 1) . ' out of ' . $totalStudents : 'N/A',
-            'percentage' => $total_subjects > 0 ? ($total_score / ($total_subjects * 100)) * 100 : 0
+            'overall_grade' => $this->calculateGrade($average_score),
+            'rank' => $student_rank . ' out of ' . $class_rankings->count(),
+            'percentage' => $average_score
         ];
 
-        \Log::info('Rankings:', [
-            'class_rankings' => $classRankings->toArray(),
-            'student_rank' => $studentRank + 1,
-            'total_students' => $totalStudents
-        ]);
-
-        // Prepare school details
-        $school_details = [
-            'name' => $reportCard->tenant->name ?? 'N/A',
-            'address' => $reportCard->tenant->address ?? '',
-            'phone' => $reportCard->tenant->phone ?? '',
-            'email' => $reportCard->tenant->email ?? '',
-            'logo' => $reportCard->tenant->logo_url ?? null
-        ];
-
-        // After preparing all data
-        \Log::info('Final data for PDF view:', [
-            'student_details' => $student_details,
-            'exam_details' => $exam_details,
-            'subjects' => $subjects,
-            'summary' => $summary,
-            'school_details' => $school_details
-        ]);
-
-        try {
-            $pdf = PDF::loadView('pdf.report_card', compact(
-                'student_details',
-                'exam_details',
-                'subjects',
-                'summary',
-                'school_details'
-            ));
-            
-            // Return the PDF content instead of streaming it
-            return $pdf->output();
-        } catch (\Exception $e) {
-            \Log::error('PDF generation error', [
-                'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString(),
-                'data' => [
-                    'subjects' => $subjects,
-                    'summary' => $summary
-                ]
-            ]);
-            throw $e; // Re-throw to be caught in batchPrint
-        }
-    }
-
-    // Helper function to calculate overall grade
-    private function calculateOverallGrade($average_score)
-    {
-        if ($average_score >= 80) return 'A';
-        if ($average_score >= 65) return 'B';
-        if ($average_score >= 50) return 'C';
-        return 'D';
+        // Generate PDF
+        return PDF::loadView('pdf.report_card', compact(
+            'student_details',
+            'exam_details',
+            'subjects',
+            'summary'
+        ))->output();
     }
 
     private function generateNominalListPdf($reportCards)
@@ -493,7 +407,7 @@ class ReportCardController extends Controller
                 $average = $subjectCount > 0 ? $total / $subjectCount : 0;
                 $averages[$student->id] = number_format($average, 1);
                 
-                $grades[$student->id] = $this->calculateOverallGrade($average);
+                $grades[$student->id] = $this->calculateGrade($average);
             }
 
             // Calculate positions based on averages
@@ -714,6 +628,12 @@ class ReportCardController extends Controller
     private function generateStudentReportCard($reportCard, $allStudentReportCards)
     {
         try {
+            // Add debug logging
+            \Log::info('Generating student report card', [
+                'reportCard' => $reportCard->toArray(),
+                'allStudentReportCards' => $allStudentReportCards->toArray()
+            ]);
+
             // Get student details
             $student = $reportCard->student;
             $class = SchoolClass::find($student->school_class_id);
@@ -766,16 +686,23 @@ class ReportCardController extends Controller
                     'name' => $rc->subject->name,
                     'score' => number_format($score, 2),
                     'percentage' => number_format($score, 1),
-                    'grade' => $rc->grade,
-                    'remarks' => $rc->remarks ?? ''
+                    'grade' => $this->calculateGrade($score),
+                    'remarks' => $this->generateRemarks($score) // Always use generated remarks, ignore stored ones
                 ];
             })->values()->toArray();
 
-            // Calculate summary
+            // Add debug logging for final data
+            \Log::info('Final subjects data', [
+                'subjects' => $subjects,
+                'total_score' => $allStudentReportCards->sum('score'),
+                'total_subjects' => $allStudentReportCards->count()
+            ]);
+
+            // Calculate summary with overall grade
             $total_score = $allStudentReportCards->sum('score');
             $total_subjects = $allStudentReportCards->count();
             $average_score = $total_subjects > 0 ? round($total_score / $total_subjects, 2) : 0;
-            $overall_grade = $this->calculateOverallGrade($average_score);
+            $overall_grade = $this->calculateGrade($average_score);
 
             $summary = [
                 'total_score' => $total_score,
@@ -809,9 +736,9 @@ class ReportCardController extends Controller
             return $pdf->output();
 
         } catch (\Exception $e) {
-            Log::error('Error generating student report card', [
-                'student_id' => $reportCard->student_id,
-                'error' => $e->getMessage()
+            \Log::error('Error in generateStudentReportCard', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
             ]);
             throw $e;
         }
@@ -845,6 +772,36 @@ class ReportCardController extends Controller
             return response()->download($zipFile)->deleteFileAfterSend(true);
         } catch (\Exception $e) {
             return response()->json(['error' => $e->getMessage()], 500);
+        }
+    }
+
+    private function generateRemarks($score) {
+        switch (true) {
+            case $score >= 76:
+                return "Exceeding Expectation. Shows exceptional understanding and mastery of subject matter.";
+            
+            case $score >= 51:
+                return "Meeting Expectation. Demonstrates good understanding of core concepts.";
+            
+            case $score >= 26:
+                return "Approaching Expectation. Shows basic understanding but needs more practice.";
+            
+            default:
+                return "Below Expectation. Requires immediate intervention and support.";
+        }
+    }
+
+    // Add this method to get grade from score
+    private function calculateGrade($score) {
+        switch (true) {
+            case $score >= 76:
+                return 'EE'; // Exceeding Expectation
+            case $score >= 51:
+                return 'ME'; // Meeting Expectation
+            case $score >= 26:
+                return 'AE'; // Approaching Expectation
+            default:
+                return 'BE'; // Below Expectation
         }
     }
 }

@@ -13,8 +13,11 @@
         body {
             font-family: 'Roboto', sans-serif;
             color: #2d3748;
-            background: #f7fafc;
+            background: #fff;
             font-size: 11px;
+            line-height: 1.3;
+            margin: 0;
+            padding: 10px;
         }
         .header {
             position: relative;
@@ -27,9 +30,9 @@
             z-index: 1;
         }
         .card {
-            background: white;
+            background: #fff;
             border-radius: 0.5rem;
-            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+            box-shadow: none;
             padding: 1.5rem;
             margin: 1rem;
         }
@@ -58,7 +61,7 @@
             gap: 1.5rem;
         }
         .sidebar {
-            background: #edf2f7;
+            background: #fff;
             padding: 1rem;
             border-radius: 0.5rem;
         }
@@ -68,7 +71,7 @@
             border: 1px solid #e2e8f0;
         }
         .details-table td {
-            padding: 6px;
+            padding: 3px 6px;
             border: 1px solid #e2e8f0;
             font-size: 11px;
         }
@@ -98,13 +101,23 @@
         }
         .watermark {
             position: fixed;
-            opacity: 0.08;
-            font-size: 100px;
+            opacity: 0.05;
             transform: rotate(-30deg);
-            left: 100px;
-            top: 300px;
-            color: #2c3e50;
+            left: 50%;
+            top: 50%;
+            transform: translate(-50%, -50%) rotate(-30deg);
             pointer-events: none;
+            z-index: -1;
+        }
+        .watermark img {
+            max-width: 300px;
+            height: auto;
+        }
+        .watermark-text {
+            font-size: 100px;
+            color: #2c3e50;
+            text-transform: uppercase;
+            font-weight: bold;
         }
         .footer {
             position: fixed;
@@ -114,22 +127,23 @@
             height: 40px;
             text-align: center;
             color: #7f8c8d;
-            font-size: 10px;
+            font-size: 9px;
             border-top: 1px solid #eee;
             padding-top: 10px;
             background: white;
+            margin-top: 10px;
         }
         .school-header {
             text-align: center;
-            margin-bottom: 20px;
+            margin-bottom: 10px;
             border-bottom: 1px solid #333;
-            padding-bottom: 15px;
+            padding-bottom: 10px;
         }
         
         .school-logo {
-            max-width: 60px;
+            max-width: 50px;
             height: auto;
-            margin: 0 auto 10px auto;
+            margin: 0 auto 5px auto;
             display: block;
         }
 
@@ -158,7 +172,7 @@
         }
 
         .student-info {
-            margin: 15px 0;
+            margin: 10px 0;
             border: 1px solid #e2e8f0;
             padding: 10px;
             border-radius: 8px;
@@ -172,7 +186,7 @@
 
         .subject-table th, .subject-table td {
             border: 1px solid #e2e8f0;
-            padding: 6px;
+            padding: 4px 6px;
             text-align: left;
             font-size: 11px;
         }
@@ -183,16 +197,16 @@
         }
 
         .summary-section {
-            margin: 15px 0;
+            margin: 10px 0;
             padding: 10px;
-            background: #f8fafc;
+            background: #fff;
             border-radius: 8px;
             page-break-inside: avoid;
         }
 
         .summary-section h3 {
+            margin: 5px 0;
             font-size: 12px;
-            margin: 0 0 8px 0;
         }
 
         .signature-section {
@@ -203,6 +217,7 @@
             width: 100%;
             padding: 0 15px;
             background: white;
+            margin-top: 10px;
         }
 
         .signature-box {
@@ -214,7 +229,7 @@
 
         .signature-line {
             border-top: 1px solid #000;
-            margin-top: 20px;
+            margin-top: 10px;
             padding-top: 5px;
             font-size: 11px;
         }
@@ -226,23 +241,23 @@
         }
 
         .container {
-            padding: 15px;
+            padding: 10px;
             max-width: 800px;
             margin: 0 auto;
-            padding-bottom: 150px;
+            padding-bottom: 100px;
         }
 
         .report-title {
             text-align: center;
             font-size: 14px;
             font-weight: bold;
-            margin: 15px 0;
+            margin: 10px 0;
             text-transform: uppercase;
         }
 
         .exam-header {
             text-align: center;
-            margin: 15px 0;
+            margin: 10px 0;
         }
 
         .exam-header h2 {
@@ -254,9 +269,9 @@
         }
 
         .default-logo {
-            width: 60px;
-            height: 60px;
-            margin: 0 auto 10px auto;
+            width: 50px;
+            height: 50px;
+            margin: 0 auto 5px auto;
             background-color: #3182ce;
             color: white;
             border-radius: 50%;
@@ -269,25 +284,26 @@
         }
 
         .graphs-container {
-            display: flex !important;
-            justify-content: center !important;
-            margin: 15px 0 !important;
-            width: 100% !important;
+            display: flex;
+            justify-content: center;
+            margin: 10px 0;
+            width: 100%;
         }
 
         .graph-box {
-            width: 100% !important;
-            margin: 0 !important;
-            flex-shrink: 0 !important;
+            width: 100%;
             background: #fff;
             border: 1px solid #e2e8f0;
             border-radius: 8px;
-            padding: 10px;
+            padding: 5px;
+            height: 180px;
         }
 
         .line-chart {
-            height: 120px !important;
-            margin: 0 !important;
+            position: relative;
+            height: 130px;
+            margin: 5px 0;
+            padding: 0 10px 20px 35px;
         }
 
         .chart-grid {
@@ -309,7 +325,7 @@
 
         .grid-label {
             position: absolute;
-            left: -35px;
+            left: -30px;
             transform: translateY(-50%);
             font-size: 8px;
             color: #718096;
@@ -317,27 +333,22 @@
 
         .chart-line {
             position: absolute;
-            left: 40px;
-            right: 15px;
-            bottom: 25px;
-            height: calc(100% - 25px);
+            left: 35px;
+            right: 10px;
+            bottom: 20px;
+            height: calc(100% - 20px);
         }
 
         .line-path {
-            position: absolute;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            height: 100%;
             fill: none;
             stroke: #3182ce;
-            stroke-width: 2px;
+            stroke-width: 2;
         }
 
         .line-point {
             position: absolute;
-            width: 8px;
-            height: 8px;
+            width: 6px;
+            height: 6px;
             background: white;
             border: 2px solid #3182ce;
             border-radius: 50%;
@@ -345,42 +356,63 @@
             z-index: 2;
         }
 
-        .x-label {
-            position: absolute;
-            bottom: -25px;
-            transform: translateX(-50%);
-            font-size: 9px;
-            color: #4a5568;
-            white-space: nowrap;
-        }
-
         .point-value {
             position: absolute;
-            top: -15px;
+            bottom: 15px;
             left: 50%;
             transform: translateX(-50%);
-            font-size: 9px;
+            font-size: 8px;
             background: white;
             padding: 1px 3px;
             border-radius: 2px;
             color: #2d3748;
             font-weight: bold;
-            z-index: 1;
+            white-space: nowrap;
+        }
+
+        .x-label {
+            position: absolute;
+            bottom: -20px;
+            left: 50%;
+            transform: translateX(-50%);
+            font-size: 8px;
+            color: #4a5568;
+            white-space: nowrap;
         }
 
         .graph-title {
             font-size: 11px;
             font-weight: bold;
             text-align: center;
-            margin-bottom: 10px;
+            margin-bottom: 5px;
             color: #2d3748;
             padding-bottom: 3px;
             border-bottom: 1px solid #e2e8f0;
         }
+
+        /* Make remarks column wider to accommodate the text */
+        .subject-table th:last-child,
+        .subject-table td:last-child {
+            width: 40%;
+        }
+
+        /* Ensure remarks text wraps properly */
+        .subject-table td:last-child {
+            white-space: normal;
+            line-height: 1.2;
+        }
     </style>
 </head>
 <body>
-    <div class="watermark">{{ $student_details['school_name'] }}</div>
+    <div class="watermark">
+        @if(isset($student_details['school_logo']) && $student_details['school_logo'])
+            <img src="{{ $student_details['school_logo'] }}" alt="School Logo">
+        @else
+            <div class="watermark-text">
+                {{ strtoupper(substr($student_details['school_name'], 0, 2)) }}
+            </div>
+        @endif
+    </div>
 
     <div class="container">
         <!-- School Header -->
@@ -483,8 +515,7 @@
         </div>
 
         <div class="graphs-container">
-            <!-- Performance Line Chart -->
-            <div class="graph-box" style="width: 100% !important;">
+            <div class="graph-box">
                 <div class="graph-title">Subject Performance</div>
                 <div class="line-chart">
                     <div class="chart-grid">
@@ -504,10 +535,11 @@
                             $pathData = '';
                             foreach($subjects as $index => $subject) {
                                 $x = $totalPoints > 1 ? ($index * $spacing) : 50;
+                                $y = 100 - floatval($subject['score']);
                                 if ($index === 0) {
-                                    $pathData .= "M {$x} " . (100 - $subject['score']);
+                                    $pathData .= "M {$x} {$y}";
                                 } else {
-                                    $pathData .= " L {$x} " . (100 - $subject['score']);
+                                    $pathData .= " L {$x} {$y}";
                                 }
                             }
                         @endphp
@@ -519,9 +551,10 @@
                         @foreach($subjects as $index => $subject)
                             @php
                                 $x = $totalPoints > 1 ? ($index * $spacing) : 50;
+                                $y = floatval($subject['score']);
                             @endphp
-                            <div class="line-point" style="left: {{ $x }}%; bottom: {{ $subject['score'] }}%">
-                                <span class="point-value">{{ $subject['score'] }}</span>
+                            <div class="line-point" style="left: {{ $x }}%; bottom: {{ $y }}%">
+                                <span class="point-value">{{ $y }}%</span>
                             </div>
                             <div class="x-label" style="left: {{ $x }}%">
                                 {{ substr($subject['name'], 0, 3) }}

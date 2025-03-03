@@ -476,6 +476,73 @@ const selectedClassStudents = computed(() => {
 
 // Initial fetch
 fetchClasses();
+
+// Add these helper functions at the script section
+const calculateGrade = (score) => {
+    if (score >= 80) return 'A';
+    if (score >= 70) return 'B';
+    if (score >= 60) return 'C';
+    if (score >= 50) return 'D';
+    if (score >= 40) return 'E';
+    return 'F';
+};
+
+const generateRemarks = (score) => {
+    if (score >= 90) return "Exceptional mastery of subject. Shows deep understanding and excellent analytical skills.";
+    if (score >= 80) return "Strong performance. Demonstrates thorough understanding of concepts.";
+    if (score >= 70) return "Good grasp of subject matter. Shows consistent effort and understanding.";
+    if (score >= 60) return "Satisfactory performance. More practice needed in some areas.";
+    if (score >= 50) return "Fair understanding. Needs to focus on improving key concepts.";
+    if (score >= 40) return "Below average. Requires additional support and dedicated practice.";
+    if (score >= 30) return "Significant improvement needed. Recommend remedial classes.";
+    return "Critical attention required. Parent-teacher meeting recommended.";
+};
+
+// Add this to your data properties
+const allowOverride = ref(false);
+
+// Add this method to your script section
+const updateGradeAndRemarks = (subject) => {
+    if (!allowOverride.value) {
+        const score = parseFloat(subject.score);
+        if (!isNaN(score)) {
+            subject.grade = calculateGrade(score);
+            subject.remarks = generateRemarks(score);
+        }
+    }
+};
+
+// Update your save/submit method to include the calculated values
+const submitForm = async () => {
+    try {
+        // Update grades and remarks before submission if not overridden
+        if (!allowOverride.value) {
+            subjects.value.forEach(subject => {
+                const score = parseFloat(subject.score);
+                if (!isNaN(score)) {
+                    subject.grade = calculateGrade(score);
+                    subject.remarks = generateRemarks(score);
+                }
+            });
+        }
+
+        // Your existing submission code...
+        
+    } catch (error) {
+        console.error('Error submitting form:', error);
+        // Error handling...
+    }
+};
+
+// Add a watcher for the allowOverride value
+watch(allowOverride, (newValue) => {
+    if (!newValue) {
+        // When override is disabled, recalculate all grades and remarks
+        subjects.value.forEach(subject => {
+            updateGradeAndRemarks(subject);
+        });
+    }
+});
 </script>
 
 <style scoped>

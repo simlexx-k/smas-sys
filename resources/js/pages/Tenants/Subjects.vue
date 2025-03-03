@@ -111,6 +111,64 @@
                     rows="3"
                   ></textarea>
                 </div>
+                <div class="mb-4">
+                  <label class="block text-sm font-medium text-gray-700">Score</label>
+                  <input 
+                    type="number" 
+                    v-model="form.score"
+                    min="0"
+                    max="100"
+                    step="0.01"
+                    class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                    @input="validateScore"
+                  >
+                </div>
+                <div class="mb-4">
+                  <label class="block text-sm font-medium text-gray-700">Grade (Auto-calculated)</label>
+                  <input 
+                    type="text" 
+                    v-model="form.grade"
+                    class="mt-1 block w-full rounded-md border-gray-300 bg-gray-50 shadow-sm sm:text-sm"
+                    readonly
+                  >
+                </div>
+                <div class="mb-4">
+                  <label class="block text-sm font-medium text-gray-700">Remarks (Auto-generated)</label>
+                  <textarea 
+                    v-model="form.remarks"
+                    rows="2"
+                    class="mt-1 block w-full rounded-md border-gray-300 bg-gray-50 shadow-sm sm:text-sm"
+                    readonly
+                  ></textarea>
+                </div>
+                <div class="mb-4">
+                  <label class="inline-flex items-center">
+                    <input 
+                      type="checkbox" 
+                      v-model="allowOverride"
+                      class="rounded border-gray-300 text-indigo-600 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+                    >
+                    <span class="ml-2 text-sm text-gray-600">Allow manual override of grade and remarks</span>
+                  </label>
+                </div>
+                <template v-if="allowOverride">
+                  <div class="mb-4">
+                    <label class="block text-sm font-medium text-gray-700">Custom Grade</label>
+                    <input 
+                      type="text" 
+                      v-model="form.grade"
+                      class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                    >
+                  </div>
+                  <div class="mb-4">
+                    <label class="block text-sm font-medium text-gray-700">Custom Remarks</label>
+                    <textarea 
+                      v-model="form.remarks"
+                      rows="2"
+                      class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                    ></textarea>
+                  </div>
+                </template>
               </div>
               <div class="mt-6 flex justify-end gap-2">
                 <button
@@ -137,7 +195,7 @@
 
 <script setup lang="ts">
 import axios from 'axios';
-import { ref, computed, onMounted } from 'vue';
+import { ref, computed, onMounted, watch } from 'vue';
 import AppLayout from '@/layouts/AppLayout.vue';
 import { Head, usePage, router } from '@inertiajs/vue3';
 import { Search } from 'lucide-vue-next';
@@ -202,6 +260,8 @@ const form = ref<SubjectForm>({
   code: '',
   description: ''
 });
+
+const allowOverride = ref(false);
 
 const navigateToCreateSubject = () => {
   router.visit(route('manage-subject'));
@@ -272,6 +332,7 @@ const closeModal = () => {
     code: '',
     description: ''
   };
+  allowOverride.value = false;
   console.log('Modal state after closing:', { showModal: showModal.value, isEditing: isEditing.value });
 };
 
@@ -328,6 +389,38 @@ const initializeCsrf = async () => {
   } catch (error) {
     console.error('Error getting CSRF cookie:', error);
   }
+};
+
+const calculateGrade = (score) => {
+    if (score >= 80) return 'A';
+    if (score >= 70) return 'B';
+    if (score >= 60) return 'C';
+    if (score >= 50) return 'D';
+    if (score >= 40) return 'E';
+    return 'F';
+};
+
+const generateRemarks = (score) => {
+    if (score >= 90) return "Exceptional mastery of subject. Shows deep understanding and excellent analytical skills.";
+    if (score >= 80) return "Strong performance. Demonstrates thorough understanding of concepts.";
+    if (score >= 70) return "Good grasp of subject matter. Shows consistent effort and understanding.";
+    if (score >= 60) return "Satisfactory performance. More practice needed in some areas.";
+    if (score >= 50) return "Fair understanding. Needs to focus on improving key concepts.";
+    if (score >= 40) return "Below average. Requires additional support and dedicated practice.";
+    if (score >= 30) return "Significant improvement needed. Recommend remedial classes.";
+    return "Critical attention required. Parent-teacher meeting recommended.";
+};
+
+const validateScore = (event) => {
+    let value = parseFloat(event.target.value);
+    if (isNaN(value)) {
+        form.value.score = '';
+    } else {
+        value = Math.min(100, Math.max(0, value));
+        form.value.score = value.toString();
+        form.value.grade = calculateGrade(value);
+        form.value.remarks = generateRemarks(value);
+    }
 };
 
 onMounted(async () => {

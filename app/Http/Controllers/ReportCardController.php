@@ -58,25 +58,25 @@ class ReportCardController extends Controller
         ];
 
         // Get subjects and scores
-        $subjects = $reportCard->scores->map(function($score) {
-            return [
-                'name' => $score->subject->name,
-                'score' => $score->score,
-                'grade' => $score->grade,
-                'remarks' => $score->remarks
-            ];
-        })->toArray();
+        $subjects = collect([
+            [
+                'name' => $reportCard->subject->name,
+                'score' => floatval($reportCard->score),
+                'grade' => $this->calculateGrade(floatval($reportCard->score)),
+                'remarks' => $this->generateRemarks(floatval($reportCard->score))
+            ]
+        ])->toArray();
 
         // Calculate summary
-        $total_score = $reportCard->scores->sum('score');
-        $total_subjects = $reportCard->scores->count();
-        $average_score = $total_subjects > 0 ? round($total_score / $total_subjects, 2) : 0;
+        $total_score = floatval($reportCard->score);
+        $total_subjects = 1;
+        $average_score = $total_score;
 
         $summary = [
             'total_score' => $total_score,
             'total_subjects' => $total_subjects,
             'average_score' => $average_score,
-            'overall_grade' => $reportCard->grade,
+            'overall_grade' => $this->calculateGrade($average_score),
             'rank' => $reportCard->rank ?? 'N/A'
         ];
 
@@ -94,5 +94,43 @@ class ReportCardController extends Controller
         $pdf = PDF::loadView('pdf.report_card', $viewData);
 
         return $pdf->stream('report-card.pdf');
+    }
+
+    private function calculateGrade($score) {
+        switch (true) {
+            case $score >= 80:
+                return 'A';
+            case $score >= 70:
+                return 'B';
+            case $score >= 60:
+                return 'C';
+            case $score >= 50:
+                return 'D';
+            case $score >= 40:
+                return 'E';
+            default:
+                return 'F';
+        }
+    }
+
+    private function generateRemarks($score) {
+        switch (true) {
+            case $score >= 90:
+                return "Exceptional mastery of subject. Shows deep understanding and excellent analytical skills.";
+            case $score >= 80:
+                return "Strong performance. Demonstrates thorough understanding of concepts.";
+            case $score >= 70:
+                return "Good grasp of subject matter. Shows consistent effort and understanding.";
+            case $score >= 60:
+                return "Satisfactory performance. More practice needed in some areas.";
+            case $score >= 50:
+                return "Fair understanding. Needs to focus on improving key concepts.";
+            case $score >= 40:
+                return "Below average. Requires additional support and dedicated practice.";
+            case $score >= 30:
+                return "Significant improvement needed. Recommend remedial classes.";
+            default:
+                return "Critical attention required. Parent-teacher meeting recommended.";
+        }
     }
 } 
