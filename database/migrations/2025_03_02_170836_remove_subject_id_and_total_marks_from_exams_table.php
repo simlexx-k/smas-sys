@@ -12,7 +12,7 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('exams', function (Blueprint $table) {
-            $table->dropForeign(['subject_id']);
+            //$table->dropForeign(['subject_id']);
             $table->dropColumn('subject_id');
             $table->dropColumn('total_marks');
         });
@@ -24,7 +24,7 @@ return new class extends Migration
     public function down(): void
     {
         Schema::table('exams', function (Blueprint $table) {
-            $table->foreignId('subject_id')->constrained()->onDelete('cascade');
+            //$table->foreignId('subject_id')->constrained()->onDelete('cascade');
             $table->integer('total_marks');
         });
     }
