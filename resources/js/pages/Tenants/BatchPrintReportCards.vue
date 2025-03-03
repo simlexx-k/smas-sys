@@ -20,21 +20,68 @@
           <div
             v-for="classItem in classes"
             :key="classItem.id"
-            @click="selectedClass = classItem.id"
-            class="p-4 border rounded-lg cursor-pointer transition-all duration-200"
-            :class="{
-              'border-primary-500 bg-primary-50': selectedClass === classItem.id,
-              'border-gray-200 hover:border-gray-300': selectedClass !== classItem.id
-            }"
+            class="border rounded-lg overflow-hidden"
           >
-            <div class="flex items-center gap-3">
-              <div class="flex-1">
+            <!-- Class Header -->
+            <div class="p-4 cursor-pointer transition-all duration-200 flex items-center justify-between">
+              <!-- Click handler for the main area (selects the class) -->
+              <div 
+                class="flex-1" 
+                @click="selectedClass = classItem.id"
+              >
                 <h3 class="font-medium text-gray-900">{{ classItem.name }}</h3>
                 <p class="text-sm text-gray-500">{{ classItem.student_count }} student(s)</p>
               </div>
-              <svg v-if="selectedClass === classItem.id" class="w-5 h-5 text-primary-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
-              </svg>
+              <div class="flex items-center gap-2">
+                <svg 
+                  v-if="selectedClass === classItem.id" 
+                  class="w-5 h-5 text-primary-500" 
+                  fill="none" 
+                  stroke="currentColor" 
+                  viewBox="0 0 24 24"
+                >
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+                </svg>
+                <!-- Separate click handler for the expand/collapse button -->
+                <button
+                  @click.stop="toggleExpand(classItem.id)"
+                  class="p-1 hover:bg-gray-100 rounded-full"
+                >
+                  <svg 
+                    class="w-5 h-5 text-gray-400 transform transition-transform"
+                    :class="{ 'rotate-180': expandedClasses[classItem.id] }"
+                    fill="none" 
+                    stroke="currentColor" 
+                    viewBox="0 0 24 24"
+                  >
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+                  </svg>
+                </button>
+              </div>
+            </div>
+
+            <!-- Students List (Expandable) -->
+            <div 
+              v-if="expandedClasses[classItem.id]"
+              class="border-t border-gray-200 bg-gray-50"
+            >
+              <div class="p-4">
+                <h4 class="text-sm font-medium text-gray-700 mb-2">Students List</h4>
+                <div class="max-h-48 overflow-y-auto">
+                  <ul class="space-y-1">
+                    <li 
+                      v-for="student in classItem.students" 
+                      :key="student.id"
+                      class="text-sm text-gray-600 py-1 px-2 rounded hover:bg-gray-100"
+                    >
+                      {{ student.full_name }}
+                    </li>
+                  </ul>
+                  <div v-if="!classItem.students?.length" class="text-sm text-gray-500 italic">
+                    No students found
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
         </div>
@@ -77,6 +124,47 @@
         </div>
       </div>
 
+      <!-- Student Selection Section -->
+      <div v-if="selectedClass && selectedExam" class="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+        <h2 class="text-lg font-medium text-gray-900 mb-4">Select a Student</h2>
+        
+        <div v-if="loading" class="flex justify-center py-8">
+          <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
+        </div>
+        
+        <div v-else class="grid grid-cols-1 gap-4">
+          <!-- Find and display students for selected class -->
+          <div v-if="selectedClassStudents.length > 0" class="border rounded-lg p-4">
+            <div class="max-h-64 overflow-y-auto">
+              <div
+                v-for="student in selectedClassStudents"
+                :key="student.id"
+                @click="selectedStudent = student.id"
+                class="flex items-center gap-3 p-3 rounded-lg cursor-pointer transition-colors duration-200"
+                :class="{
+                  'bg-primary-50 border border-primary-200': selectedStudent === student.id,
+                  'hover:bg-gray-50 border border-transparent': selectedStudent !== student.id
+                }"
+              >
+                <input
+                  type="radio"
+                  :name="'student'"
+                  :value="student.id"
+                  v-model="selectedStudent"
+                  class="h-4 w-4 text-primary-600 focus:ring-primary-500"
+                />
+                <div>
+                  <h3 class="font-medium text-gray-900">{{ student.full_name }}</h3>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div v-else class="text-center py-8 text-gray-500">
+            No students found in this class
+          </div>
+        </div>
+      </div>
+
       <!-- Action Buttons -->
       <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
         <h2 class="text-lg font-medium text-gray-900 mb-4">Print Options</h2>
@@ -104,15 +192,15 @@
             <span class="text-sm text-gray-500">Print as single document</span>
           </button>
           <button
-            @click="downloadZip"
+            @click="downloadBatchReportCards"
             class="flex flex-col items-center justify-center p-6 border rounded-lg hover:bg-gray-50 transition-colors duration-200"
-            :disabled="!selectedClass || !selectedExam"
+            :disabled="!selectedClass || !selectedExam || printLoading"
           >
             <svg class="w-8 h-8 text-gray-700 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
             </svg>
-            <span class="font-medium text-gray-900">Download ZIP</span>
-            <span class="text-sm text-gray-500">Download all as ZIP</span>
+            <span class="font-medium text-gray-900">Batch Print Report Cards</span>
+            <span class="text-sm text-gray-500">Download all report cards as one PDF</span>
           </button>
         </div>
         <div v-if="printError" class="mt-4 text-sm text-red-600">
@@ -124,7 +212,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, watch } from 'vue';
+import { ref, watch, computed } from 'vue';
 import { Head, usePage } from '@inertiajs/vue3';
 import AppLayout from '@/layouts/AppLayout.vue';
 import axios from 'axios';
@@ -138,10 +226,16 @@ const tenantId = user?.tenant_id;
 
 console.log('Tenant ID:', tenantId);
 
+interface Student {
+  id: number;
+  full_name: string;
+}
+
 interface Class {
   id: number;
   name: string;
   student_count: number;
+  students: Student[];
 }
 
 interface Exam {
@@ -164,6 +258,12 @@ const selectedExam = ref<number | null>(null);
 const examLoading = ref(false);
 const examError = ref<string | null>(null);
 
+// Add new ref for expanded classes
+const expandedClasses = ref<Record<number, boolean>>({});
+
+// Add student selection state
+const selectedStudent = ref<number | null>(null);
+
 const breadcrumbs = [
   {
     title: 'Batch Print Report Cards',
@@ -171,28 +271,38 @@ const breadcrumbs = [
   },
 ];
 
-// Fetch classes with proper error handling
+// Add function to toggle class details
+function toggleExpand(classId: number) {
+  expandedClasses.value[classId] = !expandedClasses.value[classId];
+}
+
+// Update fetchClasses function to include student data
 async function fetchClasses() {
   try {
     loading.value = true;
     error.value = null;
     
     const response = await axios.get('/api/classes', {
-      params: { tenant_id: tenantId }
+      params: { 
+        tenant_id: tenantId,
+        include: 'students'
+      }
     });
 
     console.log('API Response:', response.data);
 
-    // Validate response data
     if (response.data && Array.isArray(response.data.data)) {
-      classes.value = response.data.data.filter(classItem => {
-        console.log('Class Item:', classItem);
-        if (classItem && classItem.id && typeof classItem.id === 'number') {
-          classItem.student_count = classItem.students?.length || 0;
-          return true;
-        }
-        return false;
-      });
+      classes.value = response.data.data.map(classItem => ({
+        id: classItem.id,
+        name: classItem.name,
+        student_count: classItem.students?.length || 0,
+        students: classItem.students?.map(student => ({
+          id: student.id,
+          full_name: student.full_name || `${student.first_name} ${student.last_name}`
+        })) || []
+      })).filter(classItem => classItem.id && typeof classItem.id === 'number');
+
+      console.log('Processed classes:', classes.value);
     } else {
       throw new Error('Invalid response format from API');
     }
@@ -204,41 +314,43 @@ async function fetchClasses() {
   }
 }
 
+// Modify the print function
 async function printIndividual() {
-  if (!selectedClass.value || !selectedExam.value) return;
+    if (!selectedClass.value || !selectedExam.value || !selectedStudent.value) {
+        error.value = 'Please select a class, exam and student';
+        return;
+    }
 
-  try {
-    printLoading.value = true;
-    printError.value = null;
+    try {
+        printLoading.value = true;
+        printError.value = null;
 
-    const response = await axios.get(`/api/report-cards/batch-print`, {
-      params: {
-        class_id: Number(selectedClass.value),
-        exam_id: Number(selectedExam.value),
-        type: 'individual',
-        tenant_id: tenantId
-      },
-      responseType: 'blob'
-    });
+        const response = await axios.get(`/api/report-cards/batch-print`, {
+            params: {
+                class_id: Number(selectedClass.value),
+                exam_id: Number(selectedExam.value),
+                student_id: Number(selectedStudent.value),
+                type: 'individual',
+                tenant_id: tenantId
+            },
+            responseType: 'blob'
+        });
 
-    // Create Blob and download link
-    const blob = new Blob([response.data], { type: 'application/pdf' });
-    const url = window.URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.setAttribute('download', `report-cards-class-${selectedClass.value}-exam-${selectedExam.value}.pdf`);
-    document.body.appendChild(link);
-    link.click();
-
-    // Clean up
-    document.body.removeChild(link);
-    window.URL.revokeObjectURL(url);
-  } catch (err) {
-    printError.value = err.message || 'Failed to download report cards';
-    console.error('Download error:', err);
-  } finally {
-    printLoading.value = false;
-  }
+        // Create Blob and download
+        const blob = new Blob([response.data], { type: 'application/pdf' });
+        const url = window.URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.setAttribute('download', `report-card.pdf`);
+        document.body.appendChild(link);
+        link.click();
+        window.URL.revokeObjectURL(url);
+    } catch (err) {
+        printError.value = err.message || 'Failed to download report card';
+        console.error('Download error:', err);
+    } finally {
+        printLoading.value = false;
+    }
 }
 
 async function printNominalList() {
@@ -268,10 +380,38 @@ async function printNominalList() {
   }
 }
 
-function downloadZip() {
-  if (selectedClass.value && selectedExam.value) {
-    window.location.href = `/api/report-cards/batch-print?class_id=${Number(selectedClass.value)}&exam_id=${Number(selectedExam.value)}&type=zip&tenant_id=${tenantId}`;
-  }
+async function downloadBatchReportCards() {
+    if (!selectedClass.value || !selectedExam.value) return;
+    
+    try {
+        printLoading.value = true;
+        printError.value = null;
+
+        const response = await axios.get('/api/report-cards/batch-print', {
+            params: {
+                class_id: selectedClass.value,
+                exam_id: selectedExam.value,
+                type: 'batch',
+                tenant_id: tenantId
+            },
+            responseType: 'blob'
+        });
+
+        // Create and trigger download
+        const url = window.URL.createObjectURL(new Blob([response.data]));
+        const link = document.createElement('a');
+        link.href = url;
+        link.setAttribute('download', `report_cards_${selectedClass.value}_${selectedExam.value}.pdf`);
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        window.URL.revokeObjectURL(url);
+    } catch (error) {
+        printError.value = 'Failed to download report cards';
+        console.error('Error downloading report cards:', error);
+    } finally {
+        printLoading.value = false;
+    }
 }
 
 // Watch for class selection changes
@@ -328,6 +468,38 @@ async function fetchExams(classId: number) {
   }
 }
 
+// Add this computed property
+const selectedClassStudents = computed(() => {
+  const selectedClassData = classes.value.find(c => c.id === selectedClass.value);
+  return selectedClassData?.students || [];
+});
+
 // Initial fetch
 fetchClasses();
 </script>
+
+<style scoped>
+/* Add these styles for smooth transitions */
+.transform {
+  transition: transform 0.2s ease-in-out;
+}
+
+/* Add custom scrollbar styles */
+.max-h-48 {
+  scrollbar-width: thin;
+  scrollbar-color: #CBD5E0 #EDF2F7;
+}
+
+.max-h-48::-webkit-scrollbar {
+  width: 6px;
+}
+
+.max-h-48::-webkit-scrollbar-track {
+  background: #EDF2F7;
+}
+
+.max-h-48::-webkit-scrollbar-thumb {
+  background-color: #CBD5E0;
+  border-radius: 3px;
+}
+</style>

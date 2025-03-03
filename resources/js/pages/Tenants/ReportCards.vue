@@ -11,7 +11,12 @@
             <button @click="openCreateModal" class="btn-primary">
               Create Report Card
             </button>
-            <Link href="/batch-print-report-cards" class="btn-primary">Batch Print Report Cards</Link>
+            <Link href="/bulk-report-cards" class="btn-primary">
+              Bulk Entry
+            </Link>
+            <Link href="/batch-print-report-cards" class="btn-primary">
+              Batch Print Report Cards
+            </Link>
           </div>
         </div>
   
@@ -55,10 +60,30 @@
               </select>
             </div>
           </div>
+          <!-- Filtering indicator -->
+          <div v-if="isFiltering" class="mt-4 flex items-center justify-center text-sm text-gray-500">
+            <svg class="animate-spin -ml-1 mr-3 h-5 w-5 text-indigo-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+              <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+              <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+            </svg>
+            Updating results...
+          </div>
         </div>
   
         <!-- Table Section -->
-        <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+        <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden relative">
+          <!-- Loading overlay for table -->
+          <div v-if="isLoading" class="absolute inset-0 bg-white bg-opacity-75 flex items-center justify-center z-10">
+            <div class="flex items-center space-x-4">
+              <svg class="animate-spin h-8 w-8 text-indigo-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+              </svg>
+              <span class="text-gray-700 text-lg font-medium">Loading report cards...</span>
+            </div>
+          </div>
+  
+          <!-- Table content -->
           <div class="overflow-x-auto">
             <table class="min-w-full divide-y divide-gray-200">
               <thead class="bg-gray-50">
@@ -103,16 +128,27 @@
                   <h2 class="text-lg font-medium text-gray-900">{{ isEditing ? 'Edit' : 'Create' }} Report Card</h2>
                   <form @submit.prevent="saveReportCard()">
                     <div class="mt-4">
+                      <label class="block text-sm font-medium text-gray-700">Class:</label>
+                      <select v-model="modalFilters.class_id" class="form-select w-full rounded-md">
+                        <option value="">Select Class</option>
+                        <option v-for="schoolClass in classes" :key="schoolClass.id" :value="schoolClass.id">
+                          {{ schoolClass.name }}
+                        </option>
+                      </select>
+                    </div>
+                    <div class="mt-4">
                       <label class="block text-sm font-medium text-gray-700">Student:</label>
-                      <select v-model="currentReportCard.student_id" required>
-                        <option v-for="student in students" :key="student.id" :value="student.id">
-                          {{ student.name }}
+                      <select v-model="currentReportCard.student_id" required class="form-select w-full rounded-md">
+                        <option value="">Select Student</option>
+                        <option v-for="student in modalFilteredStudents" :key="student.id" :value="student.id">
+                          {{ student.full_name }}
                         </option>
                       </select>
                     </div>
                     <div class="mt-4">
                       <label class="block text-sm font-medium text-gray-700">Exam:</label>
-                      <select v-model="currentReportCard.exam_id" required>
+                      <select v-model="currentReportCard.exam_id" required class="form-select w-full rounded-md">
+                        <option value="">Select Exam</option>
                         <option v-for="exam in exams" :key="exam.id" :value="exam.id">
                           {{ exam.name }}
                         </option>
@@ -120,7 +156,8 @@
                     </div>
                     <div class="mt-4">
                       <label class="block text-sm font-medium text-gray-700">Subject:</label>
-                      <select v-model="currentReportCard.subject_id" required>
+                      <select v-model="currentReportCard.subject_id" required class="form-select w-full rounded-md">
+                        <option value="">Select Subject</option>
                         <option v-for="subject in subjects" :key="subject.id" :value="subject.id">
                           {{ subject.name }}
                         </option>
@@ -128,15 +165,32 @@
                     </div>
                     <div class="mt-4">
                       <label class="block text-sm font-medium text-gray-700">Score:</label>
-                      <input type="number" v-model="currentReportCard.score" min="0" max="100" step="0.01" required>
+                      <input 
+                        type="number" 
+                        v-model="currentReportCard.score" 
+                        min="0" 
+                        max="100" 
+                        step="0.01" 
+                        required
+                        class="form-input w-full rounded-md"
+                      >
                     </div>
                     <div class="mt-4">
                       <label class="block text-sm font-medium text-gray-700">Grade:</label>
-                      <input type="text" v-model="currentReportCard.grade" required>
+                      <input 
+                        type="text" 
+                        v-model="currentReportCard.grade" 
+                        required
+                        class="form-input w-full rounded-md"
+                      >
                     </div>
                     <div class="mt-4">
                       <label class="block text-sm font-medium text-gray-700">Remarks:</label>
-                      <textarea v-model="currentReportCard.remarks"></textarea>
+                      <textarea 
+                        v-model="currentReportCard.remarks"
+                        class="form-textarea w-full rounded-md"
+                        rows="3"
+                      ></textarea>
                     </div>
                     <div class="mt-6">
                       <button type="submit" class="btn-primary">{{ isEditing ? 'Update' : 'Create' }}</button>
@@ -153,11 +207,12 @@
   </template>
   
   <script setup lang="ts">
-  import { ref, computed, watch } from 'vue';
+  import { ref, computed, watch, nextTick } from 'vue';
   import { Head, Link } from '@inertiajs/vue3';
   import AppLayout from '@/layouts/AppLayout.vue';
   import axios from 'axios';
   import { usePage } from '@inertiajs/vue3';
+  import { useToast } from 'vue-toastification';
   
   interface ReportCard {
     id: number | null;
@@ -168,14 +223,24 @@
     grade: string;
     remarks: string;
     tenant_id: number | null;
-    student?: { full_name: string };
-    exam?: { name: string };
-    subject?: { name: string };
+    student?: {
+      id: number;
+      full_name: string;
+      school_class_id: number;
+    };
+    exam?: {
+      id: number;
+      name: string;
+    };
+    subject?: {
+      id: number;
+      name: string;
+    };
   }
   
   interface Student {
     id: number;
-    name: string;
+    full_name: string;
     school_class_id: number;
   }
   
@@ -244,9 +309,22 @@
     return students.value.filter(student => student.school_class_id === filters.value.class_id);
   });
   
+  // Add these refs at the top with other refs
+  const isLoading = ref(true);
+  const isFiltering = ref(false);
+  
+  const toast = useToast();
+  
   // Add watch to refresh data when filters change
-  watch(filters, () => {
-    fetchReportCards();
+  watch(filters, async () => {
+    isFiltering.value = true;
+    try {
+      await fetchReportCards();
+    } catch (error) {
+      toast.error("Failed to apply filters");
+    } finally {
+      isFiltering.value = false;
+    }
   }, { deep: true });
   
   // Add watch for class_id to reset student_id when class changes
@@ -269,6 +347,7 @@
       const response = await axios.get('/api/report-cards', { params });
       reportCards.value = response.data;
     } catch (error) {
+      toast.error("Failed to fetch report cards");
       console.error('Error fetching report cards:', error);
     }
   }
@@ -351,38 +430,141 @@
     }
   }
   
+  // Add modalFilters ref
+  const modalFilters = ref({
+    class_id: ''
+  });
+  
+  // Add computed for modal filtered students
+  const modalFilteredStudents = computed(() => {
+    if (!modalFilters.value.class_id) return [];  // Return empty array instead of all students
+    
+    return students.value.filter(student => {
+      // Convert both to numbers for comparison
+      return Number(student.school_class_id) === Number(modalFilters.value.class_id);
+    });
+  });
+  
   function openCreateModal() {
-    currentReportCard.value = { id: null, student_id: null, exam_id: null, subject_id: null, score: null, grade: '', remarks: '', tenant_id: usePage().props.tenant.id };
+    // Reset the form
+    currentReportCard.value = { 
+      id: null, 
+      student_id: null, 
+      exam_id: null, 
+      subject_id: null, 
+      score: null, 
+      grade: '', 
+      remarks: '', 
+      tenant_id: tenantId.value 
+    };
+    
+    // Reset the class filter
+    modalFilters.value.class_id = '';
+    
+    // Reset student selection
+    currentReportCard.value.student_id = null;
+    
     showCreateModal.value = true;
     isEditing.value = false;
   }
   
   function editReportCard(reportCard: ReportCard) {
-    currentReportCard.value = { ...reportCard };
-    showEditModal.value = true;
-    isEditing.value = true;
+    try {
+      // Set the current report card data first
+      currentReportCard.value = {
+        id: reportCard.id,
+        student_id: reportCard.student_id,
+        exam_id: reportCard.exam_id,
+        subject_id: reportCard.subject_id,
+        score: reportCard.score,
+        grade: reportCard.grade,
+        remarks: reportCard.remarks,
+        tenant_id: reportCard.tenant_id
+      };
+
+      // Then set the class filter if we have student data
+      if (reportCard.student) {
+        modalFilters.value.class_id = reportCard.student.school_class_id.toString();
+      } else {
+        // If no nested student data, find the student from our students array
+        const student = students.value.find(s => s.id === reportCard.student_id);
+        if (student) {
+          modalFilters.value.class_id = student.school_class_id.toString();
+        }
+      }
+
+      showEditModal.value = true;
+      isEditing.value = true;
+
+      // Debug log
+      console.log('Edit modal data:', {
+        reportCard,
+        currentReportCard: currentReportCard.value,
+        modalFilters: modalFilters.value,
+        student: reportCard.student,
+        modalFilteredStudents: modalFilteredStudents.value
+      });
+    } catch (error) {
+      console.error('Error setting up edit modal:', error);
+      toast.error("Failed to load report card for editing");
+    }
+  }
+  
+  function validateReportCard(reportCard: ReportCard) {
+    if (!isEditing.value && !reportCard.student_id) {
+      toast.error("Please select a student");
+      return false;
+    }
+    if (!reportCard.exam_id) {
+      toast.error("Please select an exam");
+      return false;
+    }
+    if (!reportCard.subject_id) {
+      toast.error("Please select a subject");
+      return false;
+    }
+    if (!reportCard.score || reportCard.score < 0 || reportCard.score > 100) {
+      toast.error("Please enter a valid score between 0 and 100");
+      return false;
+    }
+    if (!reportCard.grade) {
+      toast.error("Please enter a grade");
+      return false;
+    }
+    return true;
   }
   
   async function saveReportCard() {
+    if (!validateReportCard(currentReportCard.value)) {
+      return;
+    }
     try {
       const payload = { ...currentReportCard.value, tenant_id: tenantId.value };
       if (isEditing.value) {
         await axios.put(`/api/report-cards/${currentReportCard.value.id}`, payload);
+        toast.success("Report card updated successfully");
       } else {
         await axios.post('/api/report-cards', payload);
+        toast.success("Report card created successfully");
       }
       closeModal();
       await fetchReportCards();
     } catch (error) {
+      toast.error(error.response?.data?.message || "Failed to save report card");
       console.error('Error saving report card:', error);
     }
   }
   
   async function deleteReportCard(id: number) {
     try {
+      if (!confirm('Are you sure you want to delete this report card?')) {
+        return;
+      }
       await axios.delete(`/api/report-cards/${id}`);
+      toast.success("Report card deleted successfully");
       await fetchReportCards();
     } catch (error) {
+      toast.error("Failed to delete report card");
       console.error('Error deleting report card:', error);
     }
   }
@@ -394,7 +576,7 @@
   
   function getStudentName(studentId: number | null) {
     const student = students.value.find((student) => student.id === studentId);
-    return student ? student.name : '';
+    return student ? student.full_name : '';
   }
   
   const printReportCard = (reportCard: ReportCard) => {
@@ -429,12 +611,39 @@
     }
   };
   
+  // Update the watch for modalFilters to handle both create and edit modes
+  watch(() => modalFilters.value.class_id, () => {
+    if (!isEditing.value) {
+      currentReportCard.value.student_id = null;
+    }
+    // Add debug logging
+    console.log('Class changed:', {
+      classId: modalFilters.value.class_id,
+      students: students.value,
+      filtered: modalFilteredStudents.value
+    });
+  });
+  
   console.log('Tenant ID on load:', usePage().props.tenant.id);
-  fetchReportCards();
-  fetchStudents();
-  fetchExams();
-  fetchSubjects();
-  fetchClasses();
+  async function fetchInitialData() {
+    isLoading.value = true;
+    try {
+      await Promise.all([
+        fetchReportCards(),
+        fetchStudents(),
+        fetchExams(),
+        fetchSubjects(),
+        fetchClasses()
+      ]);
+    } catch (error) {
+      toast.error("Failed to load initial data");
+      console.error('Error loading initial data:', error);
+    } finally {
+      isLoading.value = false;
+    }
+  }
+  
+  fetchInitialData();
   </script>
   
   <style scoped>
@@ -449,5 +658,37 @@
   }
   .form-select {
     @apply block w-full px-3 py-2 text-base border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md;
+  }
+  .loading-overlay {
+    @apply absolute inset-0 bg-white bg-opacity-75 flex items-center justify-center z-10;
+  }
+  
+  .loading-content {
+    @apply flex items-center space-x-4;
+  }
+  
+  .loading-spinner {
+    @apply animate-spin h-8 w-8 text-indigo-600;
+  }
+  
+  /* Custom toast styles */
+  .Vue-Toastification__toast {
+    @apply font-sans;
+  }
+  
+  .Vue-Toastification__toast--success {
+    @apply bg-green-600;
+  }
+  
+  .Vue-Toastification__toast--error {
+    @apply bg-red-600;
+  }
+  
+  .Vue-Toastification__toast--info {
+    @apply bg-blue-600;
+  }
+  
+  .Vue-Toastification__toast--warning {
+    @apply bg-yellow-500;
   }
   </style>

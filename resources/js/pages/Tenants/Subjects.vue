@@ -143,11 +143,27 @@ import { Head, usePage, router } from '@inertiajs/vue3';
 import { Search } from 'lucide-vue-next';
 import Pagination from '@/components/Pagination.vue';
 
+// Add these defaults to ensure cookies are sent with requests
+axios.defaults.withCredentials = true;
+axios.defaults.headers.common['X-Requested-With'] = 'XMLHttpRequest';
+
+// Add this to get the CSRF token from the meta tag
+const token = document.head.querySelector('meta[name="csrf-token"]');
+if (token) {
+    axios.defaults.headers.common['X-CSRF-TOKEN'] = token.getAttribute('content');
+}
+
+interface Tenant {
+  id: number;
+  // add other tenant properties if needed
+}
+
 interface Subject {
   id: number;
   name: string;
   code: string;
   description: string;
+  class_id?: number | null;
 }
 
 interface Class {
@@ -155,7 +171,15 @@ interface Class {
   name: string;
 }
 
-const tenant = usePage().props.tenant;
+interface SubjectForm {
+  id: number | null;
+  class_id: number | null;
+  name: string;
+  code: string;
+  description: string;
+}
+
+const tenant = usePage().props.tenant as Tenant;
 const tenantId = tenant?.id || null;
 console.log('Initial tenant:', tenant);
 console.log('Initial tenantId:', tenantId);
@@ -171,9 +195,8 @@ const itemsPerPage = ref(10);
 const currentPage = ref(1);
 const classes = ref<Class[]>([]);
 
-const form = ref({
+const form = ref<SubjectForm>({
   id: null,
-  tenant_id: tenantId,
   class_id: null,
   name: '',
   code: '',
@@ -184,7 +207,7 @@ const navigateToCreateSubject = () => {
   router.visit(route('manage-subject'));
 };
 
-const navigateToEditSubject = (subjectId) => {
+const navigateToEditSubject = (subjectId: number) => {
   router.visit(route('manage-subject', { id: subjectId }));
 };
 
@@ -218,7 +241,6 @@ const openCreateModal = () => {
   console.groupEnd();
   form.value = { 
     id: null, 
-    tenant_id: tenantId, 
     class_id: null, 
     name: '', 
     code: '', 
@@ -230,12 +252,13 @@ const openCreateModal = () => {
 }
 
 const openEditModal = (subject: Subject) => {
-  console.log('Opening edit modal with tenantId:', tenantId, 'and subject:', subject);
-  console.log('Opening edit modal with form:', form.value);
-  form.value = { ...subject, tenant_id: tenantId };
+  console.log('Opening edit modal with subject:', subject);
+  form.value = { 
+    ...subject,
+    class_id: subject.class_id || null 
+  };
   isEditing.value = true;
   showModal.value = true;
-  console.log('Modal opened');
 };
 
 const closeModal = () => {
@@ -244,7 +267,6 @@ const closeModal = () => {
   isEditing.value = false;
   form.value = {
     id: null,
-    tenant_id: tenantId,
     class_id: null,
     name: '',
     code: '',
@@ -288,13 +310,30 @@ const fetchSubjects = async () => {
 };
 
 const fetchClasses = async () => {
-  const response = await axios.get('/api/classes');
-  classes.value = response.data;
+  try {
+    const response = await axios.get(`/api/classes?tenant_id=${tenantId}`);
+    classes.value = response.data.data;
+  } catch (error) {
+    console.error('Error fetching classes:', error.response?.data || error.message);
+    if (error.response?.status === 401) {
+      console.log('Session may have expired, refreshing page...');
+      window.location.reload();
+    }
+  }
+};
+
+const initializeCsrf = async () => {
+  try {
+    await axios.get('/sanctum/csrf-cookie');
+  } catch (error) {
+    console.error('Error getting CSRF cookie:', error);
+  }
 };
 
 onMounted(async () => {
-  await fetchSubjects();
+  await initializeCsrf();
   await fetchClasses();
+  await fetchSubjects();
 });
 </script>
 

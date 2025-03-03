@@ -9,6 +9,8 @@ import { initializeTheme } from './composables/useAppearance';
 import Toast from 'vue-toastification';
 import 'vue-toastification/dist/index.css';
 import VueApexCharts from 'vue3-apexcharts'
+import { toastOptions } from "./config/toast";
+import TenantDashboardContent from '@/components/tenants/TenantDashboardContent.vue';
 
 // Extend ImportMeta interface for Vite...
 declare module 'vite/client' {
@@ -27,14 +29,25 @@ const appName = import.meta.env.VITE_APP_NAME || 'SMAS';
 
 createInertiaApp({
     title: (title) => `${title} - ${appName}`,
-    resolve: (name) => resolvePageComponent(`./pages/${name}.vue`, import.meta.glob<DefineComponent>('./pages/**/*.vue', { eager: true })),
+    resolve: async (name) => {
+        const pages = import.meta.glob('./pages/**/*.vue');
+        const pagePath = `./pages/${name}.vue`;
+        
+        if (!pages[pagePath]) {
+            throw new Error(`Page not found: ${pagePath}`);
+        }
+        
+        const page = await pages[pagePath]();
+        return page.default;
+    },
     setup({ el, App, props, plugin }) {
-        createApp({ render: () => h(App, props) })
-            .use(plugin)
-            .use(ZiggyVue)
-            .use(Toast)
-            .component('apexchart', VueApexCharts)
-            .mount(el);
+        const app = createApp({ render: () => h(App, props) });
+        app.use(plugin);
+        app.use(ZiggyVue);
+        app.use(Toast, toastOptions);
+        app.component('apexchart', VueApexCharts);
+        app.component('TenantDashboardContent', TenantDashboardContent);
+        app.mount(el);
     },
     progress: {
         color: '#4B5563',

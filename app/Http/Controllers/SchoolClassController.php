@@ -9,22 +9,40 @@ class SchoolClassController extends Controller
 {
     public function index(Request $request)
     {
-        $tenantId = $request->query('tenant_id');
-        if (!$tenantId) {
-            return response()->json(['error' => 'Tenant ID is required'], 400);
+        \Log::info('Auth check:', [
+            'is_authenticated' => auth()->check(),
+            'user' => auth()->user(),
+            'tenant_id' => $request->query('tenant_id')
+        ]);
+
+        // Verify user has access to the tenant
+        $user = auth()->user();
+        if (!$user) {
+            return response()->json(['error' => 'Unauthenticated'], 401);
         }
 
-        $query = SchoolClass::where('tenant_id', $tenantId)
-            ->select('id', 'name')  // Only select needed fields
+        $requestedTenantId = $request->query('tenant_id');
+        
+        if ($user->tenant_id != $requestedTenantId && !$user->hasRole('landlord')) {
+            return response()->json(['error' => 'Unauthorized'], 403);
+        }
+
+        $query = SchoolClass::where('tenant_id', $requestedTenantId)
+            ->select('id', 'name')
             ->orderBy('name');
 
-        // If pagination is requested
+        if ($request->has('include') && $request->include === 'students') {
+            $query->with(['students' => function($query) use ($requestedTenantId) {
+                $query->where('tenant_id', $requestedTenantId);
+            }]);
+        }
+
         if ($request->query('paginate', true)) {
             return response()->json($query->paginate(10));
         }
 
-        // Return all results without pagination
-        return response()->json($query->get());
+        $classes = $query->get();
+        return response()->json(['data' => $classes]);
     }
 
     public function store(Request $request)

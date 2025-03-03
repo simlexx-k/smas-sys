@@ -14,8 +14,8 @@ class ReportCard extends Model
         'exam_id',
         'subject_id',
         'score',
-        'remarks',
         'grade',
+        'remarks',
         'tenant_id'
     ];
 
@@ -32,5 +32,10 @@ class ReportCard extends Model
     public function subject()
     {
         return $this->belongsTo(Subject::class);
+    }
+
+    public function tenant()
+    {
+        return $this->belongsTo(Tenant::class);
     }
 }

@@ -1,82 +1,162 @@
 <script setup lang="ts">
-import { Head, Link, usePage } from '@inertiajs/vue3';
+import { Head } from '@inertiajs/vue3';
 import SettingsLayout from '@/layouts/settings/Layout.vue';
 import { type BreadcrumbItem } from '@/types';
 import HeadingSmall from '@/components/HeadingSmall.vue';
 import AppLayout from '@/layouts/AppLayout.vue';
 import { ref, onMounted } from 'vue';
 import axios from 'axios';
+import { useToast } from 'vue-toastification';
+
+// Add props definition
+const props = defineProps<{
+    tenant: {
+        id: number;
+        name: string;
+        email: string | null;
+        phone: string | null;
+        address: string | null;
+        logo_url: string | null;
+        created_at: string;
+    }
+}>();
+
+const tenant = ref(props.tenant);
+const isLoading = ref(false);
+const showEditModal = ref(false);
+const isSubmitting = ref(false);
+
+const toast = useToast();
 
 const breadcrumbs: BreadcrumbItem[] = [
     {
-        title: 'Tenant Management',
+        title: 'School Settings',
         href: '/settings/tenant-management',
     },
 ];
 
-const tenants = ref([]);
-const isLoading = ref(true);
+function editSchoolDetails() {
+    showEditModal.value = true;
+}
 
-onMounted(async () => {
+async function saveSchoolDetails() {
+    if (!tenant.value) return;
+    
+    isSubmitting.value = true;
     try {
-        const response = await axios.get('/settings/tenant-management/tenants-for-admin');
-        console.log('Full response:', response);
-        tenants.value = response.data?.tenants || [];
+        const response = await axios.put('/settings/school', tenant.value);
+        showEditModal.value = false;
+        toast.success('School details updated successfully');
+        // Update the local tenant data with the response
+        tenant.value = response.data;
     } catch (error) {
-        console.error('Error fetching tenants:', error);
+        console.error('Error updating school details:', error);
+        toast.error('Failed to update school details');
     } finally {
-        isLoading.value = false;
+        isSubmitting.value = false;
     }
-});
+}
 
 const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString();
 };
 </script>
+
 <template>
     <AppLayout :breadcrumbs="breadcrumbs">
-        <Head title="Tenant Management" />
+        <Head title="School Settings" />
 
         <SettingsLayout>
             <div class="space-y-6">
-                <HeadingSmall title="Tenant Management" description="Manage your tenant settings and configurations" />
+                <HeadingSmall 
+                    title="School Settings" 
+                    description="Manage your school information and configurations" 
+                />
 
-                <div v-if="isLoading" class="flex justify-center items-center h-32">
-                    <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
+                <!-- Debug output -->
+                <pre class="bg-gray-100 p-4 rounded">{{ tenant }}</pre>
+
+                <!-- School Details -->
+                <div v-if="tenant" class="bg-white rounded-lg shadow p-6">
+                    <div class="flex justify-between items-start mb-6">
+                        <div>
+                            <h2 class="text-lg font-medium text-gray-900">School Information</h2>
+                            <p class="mt-1 text-sm text-gray-500">View and update your school's details</p>
+                        </div>
+                        <button 
+                            @click="editSchoolDetails"
+                            class="px-4 py-2 bg-indigo-600 text-white rounded-md text-sm font-medium hover:bg-indigo-700"
+                        >
+                            Edit Details
+                        </button>
+                    </div>
+
+                    <dl class="grid grid-cols-1 md:grid-cols-2 gap-x-4 gap-y-6">
+                        <div class="col-span-1">
+                            <dt class="text-sm font-medium text-gray-500">School Name</dt>
+                            <dd class="mt-1 text-sm text-gray-900">{{ tenant.name }}</dd>
+                        </div>
+
+                        <div class="col-span-1">
+                            <dt class="text-sm font-medium text-gray-500">Email Address</dt>
+                            <dd class="mt-1 text-sm text-gray-900">{{ tenant.email || 'Not set' }}</dd>
+                        </div>
+
+                        <div class="col-span-1">
+                            <dt class="text-sm font-medium text-gray-500">Phone Number</dt>
+                            <dd class="mt-1 text-sm text-gray-900">{{ tenant.phone || 'Not set' }}</dd>
+                        </div>
+
+                        <div class="col-span-2">
+                            <dt class="text-sm font-medium text-gray-500">Address</dt>
+                            <dd class="mt-1 text-sm text-gray-900">{{ tenant.address || 'Not set' }}</dd>
+                        </div>
+                    </dl>
                 </div>
 
-                <div v-else-if="tenants.length === 0" class="bg-white rounded-lg shadow p-6">
-                    <p class="text-neutral-500">No tenants found.</p>
-                </div>
+                <!-- Edit Modal -->
+                <div v-if="showEditModal" class="fixed inset-0 bg-gray-500 bg-opacity-75 flex items-center justify-center">
+                    <div class="bg-white rounded-lg p-6 max-w-2xl w-full mx-4">
+                        <h2 class="text-lg font-medium mb-4">Edit School Details</h2>
+                        
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div class="space-y-2">
+                                <label class="block text-sm font-medium text-gray-700">School Name</label>
+                                <input v-model="tenant.name" type="text" class="form-input w-full rounded-md" />
+                            </div>
 
-                <div v-else class="overflow-x-auto bg-white rounded-lg shadow">
-                    <table class="min-w-full divide-y divide-neutral-200">
-                        <thead class="bg-neutral-50">
-                            <tr>
-                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider">ID</th>
-                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider">Name</th>
-                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider">Domain</th>
-                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider">Created At</th>
-                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider">Status</th>
-                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider">Actions</th>
-                            </tr>
-                        </thead>
-                        <tbody class="bg-white divide-y divide-neutral-200">
-                            <tr v-for="tenant in tenants" :key="tenant.id">
-                                <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-neutral-900">{{ tenant.id }}</td>
-                                <td class="px-6 py-4 whitespace-nowrap text-sm text-neutral-500">{{ tenant.name }}</td>
-                                <td class="px-6 py-4 whitespace-nowrap text-sm text-neutral-500">{{ tenant.domain }}</td>
-                                <td class="px-6 py-4 whitespace-nowrap text-sm text-neutral-500">{{ formatDate(tenant.created_at) }}</td>
-                                <td class="px-6 py-4 whitespace-nowrap">
-                                    <span class="px-2 py-1 text-xs font-semibold rounded-full bg-green-100 text-green-800">Active</span>
-                                </td>
-                                <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                                    <button class="text-indigo-600 hover:text-indigo-900">Edit</button>
-                                    <button class="ml-4 text-red-600 hover:text-red-900">Delete</button>
-                                </td>
-                            </tr>
-                        </tbody>
-                    </table>
+                            <div class="space-y-2">
+                                <label class="block text-sm font-medium text-gray-700">Email</label>
+                                <input v-model="tenant.email" type="email" class="form-input w-full rounded-md" />
+                            </div>
+
+                            <div class="space-y-2">
+                                <label class="block text-sm font-medium text-gray-700">Phone</label>
+                                <input v-model="tenant.phone" type="text" class="form-input w-full rounded-md" />
+                            </div>
+
+                            <div class="space-y-2 md:col-span-2">
+                                <label class="block text-sm font-medium text-gray-700">Address</label>
+                                <textarea v-model="tenant.address" rows="3" class="form-textarea w-full rounded-md"></textarea>
+                            </div>
+                        </div>
+
+                        <div class="mt-6 flex justify-end space-x-3">
+                            <button 
+                                @click="showEditModal = false"
+                                class="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50"
+                            >
+                                Cancel
+                            </button>
+                            <button 
+                                @click="saveSchoolDetails"
+                                :disabled="isSubmitting"
+                                class="px-4 py-2 bg-indigo-600 text-white rounded-md text-sm font-medium hover:bg-indigo-700 disabled:opacity-50"
+                            >
+                                {{ isSubmitting ? 'Saving...' : 'Save Changes' }}
+                            </button>
+                        </div>
+                    </div>
                 </div>
             </div>
         </SettingsLayout>

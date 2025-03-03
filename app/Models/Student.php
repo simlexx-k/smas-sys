@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use App\Traits\TenantBindable;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class Student extends Model
 {
@@ -12,7 +13,7 @@ class Student extends Model
 
     protected $fillable = [
         'tenant_id',
-        'school_class_id',
+        'class_id',
         'first_name',
         'last_name',
         'date_of_birth',
@@ -39,7 +40,7 @@ class Student extends Model
         return $this->belongsTo(Guardian::class);
     }
 
-    public function schoolClass()
+    public function class()
     {
         return $this->belongsTo(SchoolClass::class, 'school_class_id');
     }

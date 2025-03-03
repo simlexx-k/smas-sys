@@ -75,24 +75,24 @@ class TenantController extends Controller
         ]);
     }
 
-    public function update(Request $request, $hashedId)
+    public function update(Request $request)
     {
-        \Log::info("Hashed ID received: " . $hashedId);
-        $tenant = Tenant::findByHashedId($hashedId);
-
+        $tenant = auth()->user()->tenant;
+        
         if (!$tenant) {
             return response()->json(['error' => 'Tenant not found'], 404);
         }
 
         $validated = $request->validate([
-            'domain' => ['required', 'string', 'max:255', Rule::unique('tenants')->ignore($tenant->id)],
-            'name' => ['required', 'string', 'max:255'],
-            'admin_id' => ['required', 'exists:users,id'],
+            'name' => 'required|string|max:255',
+            'email' => 'nullable|email|max:255',
+            'phone' => 'nullable|string|max:20',
+            'address' => 'nullable|string|max:500',
+            'logo_url' => 'nullable|string|max:255',
         ]);
 
         $tenant->update($validated);
-
-        return redirect()->route('tenants.index');
+        return response()->json($tenant);
     }
 
     public function show($hashedId)
@@ -124,20 +124,25 @@ class TenantController extends Controller
 
     public function dashboard()
     {
-        $user = auth()->user();
+        $tenant = auth()->user()->tenant;
         
-        if (!$user || $user->role !== 'tenant-admin') {
-            return response()->json(['error' => 'Unauthorized'], 401);
-        }
-
-        $tenant = $user->tenant;
-
         if (!$tenant) {
-            return response()->json(['error' => 'Tenant not found'], 404);
+            abort(404, 'Tenant not found');
         }
 
-        return Inertia::render('Tenants/TenantDashboard', [
-            'tenant' => $tenant,
+        return Inertia::render('Dashboard', [
+            'tenant' => [
+                'id' => $tenant->id,
+                'name' => $tenant->name,
+                'email' => $tenant->email,
+                'phone' => $tenant->phone,
+                'address' => $tenant->address,
+                'logo_url' => $tenant->logo_url,
+                'created_at' => $tenant->created_at
+            ],
+            'user' => [
+                'role' => auth()->user()->role
+            ]
         ]);
     }
 
@@ -287,16 +292,17 @@ class TenantController extends Controller
 
     public function reportCards()
     {
-        $tenant = app('currentTenant');
-
-        if (!$tenant) {
-            return Inertia::render('Error', [
-                'error' => 'Tenant not found',
-            ]);
-        }
-
+        $tenant = auth()->user()->tenant;
+        
         return Inertia::render('Tenants/ReportCards', [
-            'tenant' => $tenant,
+            'tenant' => [
+                'id' => $tenant->id,
+                'name' => $tenant->name,
+                'email' => $tenant->email,
+                'phone' => $tenant->phone,
+                'address' => $tenant->address,
+                'logo_url' => $tenant->logo_url,
+            ]
         ]);
     }
 
@@ -403,5 +409,62 @@ class TenantController extends Controller
 
         $tenant->delete();
         return response()->json(null, 204);
+    }
+
+    public function bulkReportCards()
+    {
+        $tenant = auth()->user()->tenant;
+        
+        return Inertia::render('Tenants/BulkReportCards', [
+            'tenant' => [
+                'id' => $tenant->id,
+                'name' => $tenant->name,
+                'email' => $tenant->email,
+                'phone' => $tenant->phone,
+                'address' => $tenant->address,
+                'logo_url' => $tenant->logo_url,
+            ]
+        ]);
+    }
+
+    public function settings()
+    {
+        $tenant = auth()->user()->tenant;
+        
+        if (!$tenant) {
+            abort(404, 'Tenant not found');
+        }
+
+        return Inertia::render('School', [
+            'tenant' => [
+                'id' => $tenant->id,
+                'name' => $tenant->name,
+                'email' => $tenant->email,
+                'phone' => $tenant->phone,
+                'address' => $tenant->address,
+                'logo_url' => $tenant->logo_url,
+                'created_at' => $tenant->created_at
+            ]
+        ]);
+    }
+
+    public function updateSettings(Request $request)
+    {
+        $tenant = auth()->user()->tenant;
+        
+        if (!$tenant) {
+            return response()->json(['error' => 'Tenant not found'], 404);
+        }
+
+        $validated = $request->validate([
+            'name' => 'required|string|max:255',
+            'email' => 'nullable|email|max:255',
+            'phone' => 'nullable|string|max:20',
+            'address' => 'nullable|string|max:500',
+            'logo_url' => 'nullable|string|max:255',
+        ]);
+
+        $tenant->update($validated);
+        return response()->json($tenant);
     }
 }

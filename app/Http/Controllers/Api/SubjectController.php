@@ -6,9 +6,12 @@ use App\Http\Controllers\Controller;
 use App\Models\Subject;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
+use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 
 class SubjectController extends Controller
 {
+    use AuthorizesRequests;
+
     public function index()
     {
         return Subject::where('tenant_id', auth()->user()->tenant_id)->get();
@@ -30,19 +33,24 @@ class SubjectController extends Controller
 
     public function show(Subject $subject)
     {
-        $this->authorize('view', $subject);
+        if ($subject->tenant_id !== auth()->user()->tenant_id) {
+            abort(403, 'Unauthorized action.');
+        }
         return $subject;
     }
 
     public function update(Request $request, Subject $subject)
     {
-        $this->authorize('update', $subject);
+        if ($subject->tenant_id !== auth()->user()->tenant_id) {
+            abort(403, 'Unauthorized action.');
+        }
 
         $validated = $request->validate([
             'name' => 'required|string|max:255',
             'code' => ['required', 'string', 'max:50', 
                 Rule::unique('subjects')->ignore($subject->id)],
-            'description' => 'nullable|string'
+            'description' => 'nullable|string',
+            'class_id' => 'required|exists:classes,id'
         ]);
 
         $subject->update($validated);
@@ -51,7 +59,10 @@ class SubjectController extends Controller
 
     public function destroy(Subject $subject)
     {
-        $this->authorize('delete', $subject);
+        if ($subject->tenant_id !== auth()->user()->tenant_id) {
+            abort(403, 'Unauthorized action.');
+        }
+        
         $subject->delete();
         return response()->noContent();
     }

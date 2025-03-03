@@ -6,7 +6,7 @@ import NavUser from '@/components/NavUser.vue';
 import { Sidebar, SidebarContent, SidebarFooter, SidebarHeader, SidebarMenu, SidebarMenuButton, SidebarMenuItem } from '@/components/ui/sidebar';
 import { type NavItem } from '@/types';
 import { Link, usePage } from '@inertiajs/vue3';
-import { BookOpen, Folder, LayoutGrid, PlusIcon, SchoolIcon } from 'lucide-vue-next';
+import { BookOpen, Folder, LayoutGrid, PlusIcon, SchoolIcon, Building } from 'lucide-vue-next';
 import AppLogo from './AppLogo.vue';
 
 const isMounted = ref(false);
@@ -78,6 +78,13 @@ const mainNavItems: NavItem[] = [
 ];
 
 const footerNavItems: NavItem[] = [
+    ...(usePage().props.auth.user?.role === 'tenant-admin' ? [
+        {
+            title: 'School Settings',
+            href: '/settings/school',
+            icon: Building,
+        }
+    ] : []),
     {
         title: 'Github Repo',
         href: 'https://github.com/laravel/vue-starter-kit',

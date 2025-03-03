@@ -18,14 +18,14 @@ class SchoolClass extends Model
 
     protected $fillable = ['name', 'tenant_id'];
 
+    public function students()
+    {
+        return $this->hasMany(Student::class, 'school_class_id');
+    }
+
     public function tenant(): BelongsTo
     {
         return $this->belongsTo(Tenant::class);
-    }
-
-    public function students()
-    {
-        return $this->hasMany(Student::class);
     }
 
     public function attendances()
