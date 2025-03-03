@@ -4,16 +4,21 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
-use App\Traits\TenantBindable;
 
 class Guardian extends Model
 {
-    use HasFactory, TenantBindable;
+    use HasFactory;
 
-    protected $fillable = ['name', 'tenant_id'];
+    protected $fillable = [
+        'first_name',
+        'last_name',
+        'phone_number',
+        'email',
+        'address',
+    ];
 
     public function students()
     {
-        return $this->hasMany(Student::class);
+        return $this->belongsToMany(Student::class);
     }
 }

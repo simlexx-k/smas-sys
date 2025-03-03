@@ -6,7 +6,7 @@ import NavUser from '@/components/NavUser.vue';
 import { Sidebar, SidebarContent, SidebarFooter, SidebarHeader, SidebarMenu, SidebarMenuButton, SidebarMenuItem } from '@/components/ui/sidebar';
 import { type NavItem } from '@/types';
 import { Link, usePage } from '@inertiajs/vue3';
-import { BookOpen, Folder, LayoutGrid, PlusIcon, SchoolIcon, Building } from 'lucide-vue-next';
+import { BookOpen, Folder, LayoutGrid, PlusIcon, SchoolIcon, Building, CreditCard, Settings, Users } from 'lucide-vue-next';
 import AppLogo from './AppLogo.vue';
 
 const isMounted = ref(false);
@@ -26,7 +26,28 @@ const mainNavItems: NavItem[] = [
         href: '/dashboard',
         icon: LayoutGrid,
     },
-    ...(usePage().props.auth.user?.role === 'tenant-admin' ? [
+    ...(usePage().props.auth.user?.role === 'landlord' ? [
+        {
+            title: 'Schools',
+            href: '/admin/tenants',
+            icon: SchoolIcon,
+        },
+        {
+            title: 'Subscriptions',
+            href: '/admin/subscriptions',
+            icon: CreditCard,
+        },
+        {
+            title: 'Plans',
+            href: '/admin/plans',
+            icon: Settings,
+        },
+        {
+            title: 'New School',
+            href: '/admin/tenants/create',
+            icon: PlusIcon,
+        },
+    ] : usePage().props.auth.user?.role === 'tenant-admin' ? [
         {
             title: 'Students',
             href: '/students',
@@ -73,12 +94,22 @@ const mainNavItems: NavItem[] = [
             href: '/tenants/create',
             icon: PlusIcon,
         },
-
     ]),
 ];
 
 const footerNavItems: NavItem[] = [
-    ...(usePage().props.auth.user?.role === 'tenant-admin' ? [
+    ...(usePage().props.auth.user?.role === 'landlord' ? [
+        {
+            title: 'System Settings',
+            href: '/admin/settings',
+            icon: Settings,
+        },
+        {
+            title: 'User Management',
+            href: '/admin/users',
+            icon: Users,
+        }
+    ] : usePage().props.auth.user?.role === 'tenant-admin' ? [
         {
             title: 'School Settings',
             href: '/settings/school',
