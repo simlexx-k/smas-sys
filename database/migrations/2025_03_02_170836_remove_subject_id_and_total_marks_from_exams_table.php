@@ -14,7 +14,7 @@ return new class extends Migration
         Schema::table('exams', function (Blueprint $table) {
             //$table->dropForeign(['subject_id']);
             //$table->dropColumn('subject_id');
-            $table->dropColumn('total_marks');
+            //$table->dropColumn('total_marks');
         });
     }
 
@@ -25,7 +25,7 @@ return new class extends Migration
     {
         Schema::table('exams', function (Blueprint $table) {
             //$table->foreignId('subject_id')->constrained()->onDelete('cascade');
-            $table->integer('total_marks');
+           // $table->integer('total_marks');
         });
     }
 };
