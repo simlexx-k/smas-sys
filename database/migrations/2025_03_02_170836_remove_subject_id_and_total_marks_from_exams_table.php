@@ -13,7 +13,7 @@ return new class extends Migration
     {
         Schema::table('exams', function (Blueprint $table) {
             //$table->dropForeign(['subject_id']);
-            $table->dropColumn('subject_id');
+            //$table->dropColumn('subject_id');
             $table->dropColumn('total_marks');
         });
     }
