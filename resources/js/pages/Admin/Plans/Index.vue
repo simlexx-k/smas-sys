@@ -3,7 +3,20 @@ import { Link, router } from '@inertiajs/vue3';
 import { useToast } from 'vue-toastification';
 import AppLayout from '@/layouts/AppLayout.vue';
 import Pagination from '@/components/Pagination.vue';
-import { Plan, BreadcrumbItem } from '@/types';
+import { BreadcrumbItem } from '@/types';
+
+// Define our own Plan interface
+interface Plan {
+    id: number; // Change back to number since that's what the backend uses
+    name: string;
+    description?: string;
+    price: number;
+    billing_period: string;
+    trial_period_days?: number;
+    features: string[];
+    is_active: boolean;
+    sort_order: number;
+}
 
 interface Props {
     plans: {
@@ -37,10 +50,6 @@ const formatPrice = (price: number) => {
     }).format(price);
 };
 
-const formatBillingPeriod = (period: string) => {
-    return period.charAt(0).toUpperCase() + period.slice(1);
-};
-
 const getStatusBadgeClass = (isActive: boolean) => {
     return isActive
         ? 'bg-green-100 text-green-800'
@@ -57,7 +66,7 @@ const copyFeatures = async (features: string[]) => {
 };
 
 const deletePlan = (planId: number) => {
-    router.delete(`/admin/plans/${planId}`, {
+    router.delete(route('admin.plans.destroy', { id: planId }), {
         onSuccess: () => {
             toast.success('Plan deleted successfully');
         },
@@ -219,10 +228,6 @@ const createPlanFromPreset = (preset: typeof planPresets[0]) => {
                                         <span>Trial Period:</span>
                                         <span>{{ plan.trial_period_days ? `${plan.trial_period_days} days` : 'No trial' }}</span>
                                     </div>
-                                    <div class="flex justify-between text-sm text-gray-500">
-                                        <span>Active Subscriptions:</span>
-                                        <span>{{ plan.subscriptions_count }}</span>
-                                    </div>
                                 </div>
 
                                 <div class="mt-6">
@@ -254,13 +259,12 @@ const createPlanFromPreset = (preset: typeof planPresets[0]) => {
                                 </button>
                                 <div class="space-x-2">
                                     <Link
-                                        :href="route('admin.plans.edit', plan.id)"
+                                        :href="route('admin.plans.edit', { id: plan.id })"
                                         class="inline-flex items-center px-3 py-1.5 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50"
                                     >
                                         Edit
                                     </Link>
                                     <button
-                                        v-if="!plan.subscriptions_count"
                                         @click="deletePlan(plan.id)"
                                         class="inline-flex items-center px-3 py-1.5 border border-transparent text-sm font-medium rounded-md text-white bg-red-600 hover:bg-red-700"
                                     >

@@ -1,11 +1,26 @@
 <script setup lang="ts">
+import { usePage } from '@inertiajs/vue3';
+import type { PageProps } from '@/types';
 import AppLayout from '@/layouts/AppLayout.vue';
 import { type BreadcrumbItem } from '@/types';
-import { Head, usePage } from '@inertiajs/vue3';
+import { Head } from '@inertiajs/vue3';
 // import PlaceholderPattern from '../components/PlaceholderPattern.vue';
 // import TenantAdminComponent1 from '@/components/tenants/TenantAttendanceCharts.vue';
 import TenantDashboardContent from '@/components/tenants/TenantDashboardContent.vue';
 import LandlordDashboardContent from '@/components/landlord/LandlordDashboardContent.vue';
+
+const page = usePage<PageProps>();
+
+defineProps<{
+    name?: string;
+    user: User;
+    tenant?: Tenant;
+    stats?: {
+        total_tenants: number;
+        active_tenants: number;
+        recent_tenants: Array<Tenant>;
+    };
+}>();
 
 const breadcrumbs: BreadcrumbItem[] = [
     {
@@ -27,43 +42,6 @@ interface Tenant {
     logo_url: string | null;
     created_at: string;
 }
-
-interface PageProps {
-    auth: {
-        user: User;
-    };
-    stats?: {
-        total_tenants: number;
-        active_tenants: number;
-        recent_tenants: {
-            data: Array<any>;
-            links: Array<any>;
-        };
-    };
-    systemStatus?: Record<string, string>;
-    activities?: {
-        data: Array<any>;
-        links: Array<any>;
-    };
-    filters?: {
-        search?: string;
-        status?: string;
-    };
-    error?: string;
-}
-
-const page = usePage<PageProps>();
-
-defineProps<{
-    name?: string;
-    user: User;
-    tenant?: Tenant;
-    stats?: {
-        total_tenants: number;
-        active_tenants: number;
-        recent_tenants: Array<Tenant>;
-    };
-}>();
 </script>
 
 <template>

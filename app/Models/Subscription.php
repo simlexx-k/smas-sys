@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use App\Traits\LogsActivity;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class Subscription extends Model
 {
@@ -12,7 +13,7 @@ class Subscription extends Model
 
     protected $fillable = [
         'tenant_id',
-        'plan',
+        'plan_id',
         'status',
         'starts_at',
         'ends_at',
@@ -41,9 +42,14 @@ class Subscription extends Model
     const STATUS_EXPIRED = 'expired';
     const STATUS_TRIAL = 'trial';
 
-    public function tenant()
+    public function tenant(): BelongsTo
     {
         return $this->belongsTo(Tenant::class);
+    }
+
+    public function plan(): BelongsTo
+    {
+        return $this->belongsTo(Plan::class, 'plan_id');
     }
 
     public function isActive(): bool

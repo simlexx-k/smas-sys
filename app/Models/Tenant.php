@@ -142,4 +142,9 @@ class Tenant extends Model
     {
         return $this->subscription && $this->subscription->isExpiringSoon();
     }
+
+    public function domains()
+    {
+        return $this->hasMany(Domain::class);
+    }
 }

@@ -1,8 +1,9 @@
 <script setup lang="ts">
-import { Link } from '@inertiajs/vue3';
+import { Link, router } from '@inertiajs/vue3';
 import { ref, watch, computed } from 'vue';
+import type { DebounceSettings } from 'lodash';
 import debounce from 'lodash/debounce';
-import Pagination from '@/Components/Pagination.vue';
+import Pagination from '@/components/Pagination.vue';
 
 interface Tenant {
     id: number;
@@ -42,6 +43,8 @@ interface SubscriptionStats {
     expiring_soon: number;
     expired: number;
     trial: number;
+    monthly_revenue: number;
+    total: number;
 }
 
 interface Props {
@@ -83,9 +86,9 @@ const props = withDefaults(defineProps<Props>(), {
 const search = ref(props.filters?.search || '');
 const status = ref(props.filters?.status || '');
 
-// Debounced search
-watch(search, debounce((value) => {
-    Inertia.get('/dashboard', { 
+// Fix debounce typing
+watch(search, debounce((value: string) => {
+    router.get('/dashboard', { 
         search: value, 
         status: status.value 
     }, {
@@ -94,9 +97,8 @@ watch(search, debounce((value) => {
     });
 }, 300));
 
-// Status filter
-watch(status, (value) => {
-    Inertia.get('/dashboard', { 
+watch(status, (value: string) => {
+    router.get('/dashboard', { 
         search: search.value, 
         status: value 
     }, {
@@ -105,19 +107,12 @@ watch(status, (value) => {
     });
 });
 
-const systemStatus = ref({
-    database: 'healthy',
-    storage: 'healthy',
-    cache: 'healthy',
-    queue: 'healthy'
-});
+const getStatusColor = (status: string) => {
+    return status === 'healthy' ? 'text-green-600' : 'text-red-600';
+};
 
 const formatDate = (date: string) => {
     return new Date(date).toLocaleString();
-};
-
-const getStatusColor = (status: string) => {
-    return status === 'healthy' ? 'text-green-600' : 'text-red-600';
 };
 
 const getActivityIcon = (type: string) => {
@@ -157,15 +152,25 @@ const quickActions = [
     }
 ];
 
-// Add subscription-specific stats
+// Update subscription stats to use actual data
 const subscriptionStats = computed(() => ({
-    total: props.stats.subscription_stats.active + 
-           props.stats.subscription_stats.expired + 
-           props.stats.subscription_stats.trial,
-    active: props.stats.subscription_stats.active,
-    expiringSoon: props.stats.subscription_stats.expiring_soon,
-    revenue: props.stats.subscription_stats.active * 100 // Example calculation
+    total: props.stats.subscription_stats.total ?? 0,
+    active: props.stats.subscription_stats.active ?? 0,
+    expiringSoon: props.stats.subscription_stats.expiring_soon ?? 0,
+    trial: props.stats.subscription_stats.trial ?? 0,
+    expired: props.stats.subscription_stats.expired ?? 0,
+    monthlyRevenue: props.stats.subscription_stats.monthly_revenue ?? 0
 }));
+
+const formatCurrency = (amount: number | null | undefined) => {
+    const value = amount ?? 0;
+    return new Intl.NumberFormat('en-US', {
+        style: 'currency',
+        currency: 'USD',
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2
+    }).format(value);
+};
 </script>
 
 <template>
@@ -230,15 +235,15 @@ const subscriptionStats = computed(() => ({
                     </p>
                 </div>
                 <div class="bg-blue-50 p-4 rounded-lg">
-                    <h4 class="text-sm font-medium text-blue-800">Total Schools</h4>
+                    <h4 class="text-sm font-medium text-blue-800">Trial Subscriptions</h4>
                     <p class="mt-2 text-2xl font-semibold text-blue-900">
-                        {{ subscriptionStats.total }}
+                        {{ subscriptionStats.trial }}
                     </p>
                 </div>
                 <div class="bg-purple-50 p-4 rounded-lg">
                     <h4 class="text-sm font-medium text-purple-800">Monthly Revenue</h4>
                     <p class="mt-2 text-2xl font-semibold text-purple-900">
-                        ${{ subscriptionStats.revenue.toLocaleString() }}
+                        {{ formatCurrency(subscriptionStats.monthlyRevenue) }}
                     </p>
                 </div>
             </div>

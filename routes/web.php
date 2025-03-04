@@ -45,15 +45,6 @@ Route::middleware(['auth', 'verified'])->group(function () {
             ->name('subscriptions.renew');
         Route::get('subscriptions/reports', [SubscriptionController::class, 'reports'])
             ->name('subscriptions.reports');
-
-        // Add this debug route
-        Route::get('/plans/debug', function () {
-            return [
-                'user' => auth()->user(),
-                'role' => auth()->user()->role,
-                'plans' => \App\Models\Plan::count()
-            ];
-        });
     });
 
     // Tenant admin routes

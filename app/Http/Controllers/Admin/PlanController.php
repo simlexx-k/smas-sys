@@ -14,7 +14,8 @@ class PlanController extends Controller
     {
         $plans = Plan::query()
             ->orderBy('sort_order')
-            ->withCount('subscriptions')
+            // Temporarily remove subscriptions count
+            // ->withCount('subscriptions')
             ->paginate(10);
 
         \Log::info('Plans data:', ['plans' => $plans]);
