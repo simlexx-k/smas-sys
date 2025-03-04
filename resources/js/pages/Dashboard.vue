@@ -8,26 +8,9 @@ import { Head } from '@inertiajs/vue3';
 // import TenantAdminComponent1 from '@/components/tenants/TenantAttendanceCharts.vue';
 import TenantDashboardContent from '@/components/tenants/TenantDashboardContent.vue';
 import LandlordDashboardContent from '@/components/landlord/LandlordDashboardContent.vue';
+import { computed } from 'vue';
 
 const page = usePage<PageProps>();
-
-defineProps<{
-    name?: string;
-    user: User;
-    tenant?: Tenant;
-    stats?: {
-        total_tenants: number;
-        active_tenants: number;
-        recent_tenants: Array<Tenant>;
-    };
-}>();
-
-const breadcrumbs: BreadcrumbItem[] = [
-    {
-        title: 'Dashboard',
-        href: '/dashboard',
-    },
-];
 
 interface User {
     role: string;
@@ -42,6 +25,39 @@ interface Tenant {
     logo_url: string | null;
     created_at: string;
 }
+
+const props = defineProps<{
+    name?: string;
+    user: User;
+    tenant?: Tenant;
+    stats?: {
+        total_tenants: number;
+        active_tenants: number;
+        recent_tenants: Array<Tenant>;
+    };
+}>();
+
+// Define breadcrumbs based on role after props
+const breadcrumbs = computed(() => {
+    const baseBreadcrumbs = [{
+        title: 'Dashboard',
+        href: '/dashboard',
+    }];
+
+    if (!props.user) return baseBreadcrumbs;
+
+    switch (props.user.role) {
+        case 'landlord':
+            return baseBreadcrumbs;
+        case 'tenant-admin':
+            return [...baseBreadcrumbs, {
+                title: props.tenant?.name || 'School',
+                href: '#'
+            }];
+        default:
+            return baseBreadcrumbs;
+    }
+});
 </script>
 
 <template>

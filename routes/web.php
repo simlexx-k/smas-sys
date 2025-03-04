@@ -7,6 +7,7 @@ use App\Http\Controllers\Admin\LandlordTenantController;
 use App\Http\Controllers\LandlordDashboardController;
 use App\Http\Controllers\Admin\SubscriptionController;
 use App\Http\Controllers\Admin\PlanController;
+use App\Http\Controllers\DashboardController;
 
 // Public routes
 Route::get('/', function () {
@@ -17,16 +18,29 @@ Route::get('/admin-redirect', [TenantController::class, 'adminRedirect'])->name(
 
 // Authenticated routes
 Route::middleware(['auth', 'verified'])->group(function () {
-    // Default dashboard route
-    Route::get('/dashboard', [LandlordDashboardController::class, 'index'])
-        ->name('dashboard');
+    // Default dashboard route (will handle redirection)
+    Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
 
-    // Landlord (super admin) routes
+    // Landlord routes
+    Route::middleware(['role:landlord'])->prefix('landlord')->name('landlord.')->group(function () {
+        Route::get('/dashboard', [DashboardController::class, 'landlord'])->name('dashboard');
+    });
+
+    // Tenant routes
+    Route::middleware(['role:tenant-admin'])->prefix('tenant')->name('tenant.')->group(function () {
+        Route::get('/dashboard', [DashboardController::class, 'tenant'])->name('dashboard');
+    });
+
+    // Existing Landlord (super admin) routes
     Route::middleware(['role:landlord'])->prefix('admin')->name('admin.')->group(function () {
+        Route::get('/tenants', [LandlordTenantController::class, 'index'])->name('tenants.index');
+        Route::post('tenants/{tenant}/impersonate', [LandlordTenantController::class, 'impersonate'])->name('tenants.impersonate');
+        Route::post('tenants/{tenant}/reset-password', [LandlordTenantController::class, 'resetAdminPassword'])->name('tenants.reset-password');
+        Route::post('tenants/{tenant}/change-plan', [LandlordTenantController::class, 'changePlan'])->name('tenants.change-plan');
         Route::resource('tenants', LandlordTenantController::class);
         Route::resource('subscriptions', SubscriptionController::class);
         
-        // New routes for plan management
+        // Plans management routes
         Route::prefix('plans')->name('plans.')->group(function () {
             Route::get('/', [PlanController::class, 'index'])->name('index');
             Route::get('/create', [PlanController::class, 'create'])->name('create');
@@ -45,6 +59,17 @@ Route::middleware(['auth', 'verified'])->group(function () {
             ->name('subscriptions.renew');
         Route::get('subscriptions/reports', [SubscriptionController::class, 'reports'])
             ->name('subscriptions.reports');
+
+        // Domain management
+        Route::prefix('tenants/{tenant}')->name('tenants.')->group(function () {
+            Route::post('domains', [LandlordTenantController::class, 'storeDomain'])->name('domains.store');
+            Route::put('domains/{domain}/primary', [LandlordTenantController::class, 'setPrimaryDomain'])->name('domains.primary');
+            
+            // Stats routes
+            Route::get('stats/usage', [LandlordTenantController::class, 'getUsageStats'])->name('stats.usage');
+            Route::get('stats/classes', [LandlordTenantController::class, 'getClassStats'])->name('stats.classes');
+            Route::get('stats/students', [LandlordTenantController::class, 'getStudentStats'])->name('stats.students');
+        });
     });
 
     // Tenant admin routes

@@ -46,11 +46,6 @@ const mainNavItems: NavItem[] = [
             title: 'New School',
             href: route('admin.tenants.create'),
             icon: PlusIcon,
-        },
-        {
-            title: 'Users',
-            href: route('admin.users.index'),
-            icon: Users,
         }
     ] : page.props.auth.user?.role === 'tenant-admin' ? [
         {
@@ -93,16 +88,7 @@ const mainNavItems: NavItem[] = [
 
 const footerNavItems: NavItem[] = [
     ...(page.props.auth.user?.role === 'landlord' ? [
-        {
-            title: 'System Settings',
-            href: route('admin.settings.index'),
-            icon: Settings,
-        },
-        {
-            title: 'User Management',
-            href: route('admin.users.index'),
-            icon: Users,
-        }
+
     ] : page.props.auth.user?.role === 'tenant-admin' ? [
         {
             title: 'School Settings',

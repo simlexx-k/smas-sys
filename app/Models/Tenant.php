@@ -8,6 +8,8 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 use App\Models\User;
 use Hashids\Hashids;
 use App\Traits\LogsActivity;
+use Illuminate\Database\Eloquent\Relations\HasOne;
+use Illuminate\Database\Eloquent\Casts\Attribute;
 
 class Tenant extends Model
 {
@@ -92,7 +94,7 @@ class Tenant extends Model
     // Check if tenant is active
     public function isActive(): bool
     {
-        return $this->status === self::STATUS_ACTIVE;
+        return $this->status === 'active' && $this->hasActiveSubscription();
     }
 
     // Check if subscription is valid
@@ -130,7 +132,13 @@ class Tenant extends Model
 
     public function hasActiveSubscription(): bool
     {
-        return $this->subscription && $this->subscription->isActive();
+        return $this->subscription()
+            ->where('status', 'active')
+            ->where(function ($query) {
+                $query->whereNull('ends_at')
+                    ->orWhere('ends_at', '>', now());
+            })
+            ->exists();
     }
 
     public function isTrialing(): bool
@@ -146,5 +154,46 @@ class Tenant extends Model
     public function domains()
     {
         return $this->hasMany(Domain::class);
+    }
+
+    protected function status(): Attribute
+    {
+        return Attribute::make(
+            get: function () {
+                if (!$this->subscription) {
+                    return 'inactive';
+                }
+
+                if ($this->subscription->status === Subscription::STATUS_ACTIVE
+                    && (!$this->subscription->ends_at || $this->subscription->ends_at > now())
+                    && !$this->subscription->cancels_at) {
+                    return 'active';
+                }
+
+                return 'inactive';
+            }
+        );
+    }
+
+    protected static function boot()
+    {
+        parent::boot();
+
+        static::saving(function ($tenant) {
+            // Only allow active status if there's a valid subscription
+            if ($tenant->status === 'active') {
+                $hasActiveSubscription = $tenant->subscription()
+                    ->where('status', 'active')
+                    ->where(function ($query) {
+                        $query->whereNull('ends_at')
+                            ->orWhere('ends_at', '>', now());
+                    })
+                    ->exists();
+
+                if (!$hasActiveSubscription) {
+                    $tenant->status = 'inactive';
+                }
+            }
+        });
     }
 }

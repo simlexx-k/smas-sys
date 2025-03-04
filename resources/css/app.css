@@ -78,6 +78,10 @@ html {
         --sidebar-border: 0 0% 15.9%;
         --sidebar-ring: 217.2 91.2% 59.8%;
     }
+
+    html {
+        -webkit-tap-highlight-color: transparent;
+    }
 }
 
 @layer base {

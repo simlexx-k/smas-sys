@@ -1,175 +1,207 @@
 <script setup lang="ts">
 import { useForm } from '@inertiajs/vue3';
-import { ref } from 'vue';
 
 interface Props {
-    school?: {
+    tenant?: {
         id: number;
         name: string;
-        email: string | null;
-        phone: string | null;
-        address: string | null;
-        logo_url: string | null;
-        is_active: boolean;
+        domain: string;
+        email: string;
+        phone: string;
+        address: string;
+        logo_url: string;
+        status: string;
+        school_type: string;
+        subscription_plan: string;
     };
-    mode: 'create' | 'edit';
+    schoolTypes: Record<string, string>;
+    subscriptionPlans: Record<string, string>;
+    statuses: Record<string, string>;
 }
 
-const props = withDefaults(defineProps<Props>(), {
-    school: undefined,
-    mode: 'create'
-});
+const props = defineProps<Props>();
 
 const form = useForm({
-    name: props.school?.name ?? '',
-    email: props.school?.email ?? '',
-    phone: props.school?.phone ?? '',
-    address: props.school?.address ?? '',
-    is_active: props.school?.is_active ?? true,
-    logo: null as File | null
+    name: props.tenant?.name ?? '',
+    domain: props.tenant?.domain ?? '',
+    email: props.tenant?.email ?? '',
+    phone: props.tenant?.phone ?? '',
+    address: props.tenant?.address ?? '',
+    logo: null as File | null,
+    status: props.tenant?.status ?? 'active',
+    school_type: props.tenant?.school_type ?? '',
+    subscription_plan: props.tenant?.subscription_plan ?? 'basic'
 });
 
-const logoPreview = ref<string | null>(props.school?.logo_url ?? null);
-const logoInput = ref<HTMLInputElement | null>(null);
-
-const handleLogoChange = (event: Event) => {
-    const input = event.target as HTMLInputElement;
-    const file = input.files?.[0];
-    
-    if (file) {
-        form.logo = file;
-        const reader = new FileReader();
-        reader.onload = (e) => {
-            logoPreview.value = e.target?.result as string;
-        };
-        reader.readAsDataURL(file);
-    }
-};
-
-const removeLogo = () => {
-    form.logo = null;
-    logoPreview.value = null;
-    if (logoInput.value) {
-        logoInput.value.value = '';
-    }
-};
-
 const submit = () => {
-    if (props.mode === 'create') {
+    if (props.tenant) {
+        form.put(route('admin.tenants.update', props.tenant.id));
+    } else {
         form.post(route('admin.tenants.store'));
-    } else if (props.school) {
-        form.put(route('admin.tenants.update', props.school.id));
     }
 };
 </script>
 
 <template>
-    <form @submit.prevent="submit" class="space-y-6">
-        <!-- Logo Upload -->
-        <div>
-            <label class="block text-sm font-medium text-gray-700">School Logo</label>
-            <div class="mt-1 flex items-center space-x-4">
-                <div v-if="logoPreview" class="relative">
-                    <img :src="logoPreview" class="h-16 w-16 rounded-full object-cover">
-                    <button
-                        type="button"
-                        @click="removeLogo"
-                        class="absolute -top-2 -right-2 rounded-full bg-red-100 p-1 text-red-600 hover:bg-red-200"
+    <form @submit.prevent="submit" class="bg-white shadow rounded-lg">
+        <div class="px-4 py-5 sm:p-6">
+            <div class="grid grid-cols-1 gap-6 sm:grid-cols-2">
+                <!-- School Name -->
+                <div>
+                    <label for="name" class="block text-sm font-medium text-gray-700">School Name</label>
+                    <input
+                        id="name"
+                        v-model="form.name"
+                        type="text"
+                        class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
                     >
-                        <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-                        </svg>
-                    </button>
+                    <p v-if="form.errors.name" class="mt-1 text-sm text-red-600">{{ form.errors.name }}</p>
                 </div>
-                <div v-else class="h-16 w-16 rounded-full bg-gray-200 flex items-center justify-center">
-                    <svg class="h-8 w-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                    </svg>
+
+                <!-- Domain -->
+                <div>
+                    <label for="domain" class="block text-sm font-medium text-gray-700">Domain</label>
+                    <input
+                        id="domain"
+                        v-model="form.domain"
+                        type="text"
+                        class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                    >
+                    <p v-if="form.errors.domain" class="mt-1 text-sm text-red-600">{{ form.errors.domain }}</p>
                 </div>
-                <input
-                    ref="logoInput"
-                    type="file"
-                    accept="image/*"
-                    class="hidden"
-                    @change="handleLogoChange"
-                >
-                <button
-                    type="button"
-                    @click="logoInput?.click()"
-                    class="px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50"
-                >
-                    Change Logo
-                </button>
+
+                <!-- Email -->
+                <div>
+                    <label for="email" class="block text-sm font-medium text-gray-700">Email</label>
+                    <input
+                        id="email"
+                        v-model="form.email"
+                        type="email"
+                        class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                    >
+                    <p v-if="form.errors.email" class="mt-1 text-sm text-red-600">{{ form.errors.email }}</p>
+                </div>
+
+                <!-- Phone -->
+                <div>
+                    <label for="phone" class="block text-sm font-medium text-gray-700">Phone</label>
+                    <input
+                        id="phone"
+                        v-model="form.phone"
+                        type="tel"
+                        class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                    >
+                    <p v-if="form.errors.phone" class="mt-1 text-sm text-red-600">{{ form.errors.phone }}</p>
+                </div>
+
+                <!-- Address -->
+                <div class="sm:col-span-2">
+                    <label for="address" class="block text-sm font-medium text-gray-700">Address</label>
+                    <textarea
+                        id="address"
+                        v-model="form.address"
+                        rows="3"
+                        class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                    />
+                    <p v-if="form.errors.address" class="mt-1 text-sm text-red-600">{{ form.errors.address }}</p>
+                </div>
+
+                <!-- School Type -->
+                <div>
+                    <label for="school_type" class="block text-sm font-medium text-gray-700">School Type</label>
+                    <select
+                        id="school_type"
+                        v-model="form.school_type"
+                        class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                    >
+                        <option value="">Select a type</option>
+                        <option 
+                            v-for="(label, value) in schoolTypes" 
+                            :key="value" 
+                            :value="value"
+                        >
+                            {{ label }}
+                        </option>
+                    </select>
+                    <p v-if="form.errors.school_type" class="mt-1 text-sm text-red-600">{{ form.errors.school_type }}</p>
+                </div>
+
+                <!-- Subscription Plan -->
+                <div>
+                    <label for="subscription_plan" class="block text-sm font-medium text-gray-700">Subscription Plan</label>
+                    <select
+                        id="subscription_plan"
+                        v-model="form.subscription_plan"
+                        class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                    >
+                        <option 
+                            v-for="(label, value) in subscriptionPlans" 
+                            :key="value" 
+                            :value="value"
+                        >
+                            {{ label }}
+                        </option>
+                    </select>
+                    <p v-if="form.errors.subscription_plan" class="mt-1 text-sm text-red-600">{{ form.errors.subscription_plan }}</p>
+                </div>
+
+                <!-- Status -->
+                <div>
+                    <label for="status" class="block text-sm font-medium text-gray-700">Status</label>
+                    <select
+                        id="status"
+                        v-model="form.status"
+                        class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                    >
+                        <option 
+                            v-for="(label, value) in statuses" 
+                            :key="value" 
+                            :value="value"
+                        >
+                            {{ label }}
+                        </option>
+                    </select>
+                    <p v-if="form.errors.status" class="mt-1 text-sm text-red-600">{{ form.errors.status }}</p>
+                </div>
+
+                <!-- Logo -->
+                <div>
+                    <label class="block text-sm font-medium text-gray-700">Logo</label>
+                    <div class="mt-1 flex items-center">
+                        <span class="inline-block h-12 w-12 overflow-hidden rounded-full bg-gray-100">
+                            <img
+                                v-if="tenant?.logo_url"
+                                :src="tenant.logo_url"
+                                :alt="tenant.name"
+                                class="h-full w-full object-cover"
+                            >
+                            <svg
+                                v-else
+                                class="h-full w-full text-gray-300"
+                                fill="currentColor"
+                                viewBox="0 0 24 24"
+                            >
+                                <path d="M24 20.993V24H0v-2.996A14.977 14.977 0 0112.004 15c4.904 0 9.26 2.354 11.996 5.993zM16.002 8.999a4 4 0 11-8 0 4 4 0 018 0z" />
+                            </svg>
+                        </span>
+                        <input
+                            type="file"
+                            class="ml-5 rounded-md border border-gray-300 bg-white py-2 px-3 text-sm font-medium leading-4 text-gray-700 shadow-sm hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
+                            @input="form.logo = $event.target.files?.[0]"
+                        >
+                    </div>
+                    <p v-if="form.errors.logo" class="mt-1 text-sm text-red-600">{{ form.errors.logo }}</p>
+                </div>
             </div>
         </div>
-
-        <!-- School Name -->
-        <div>
-            <label class="block text-sm font-medium text-gray-700">School Name</label>
-            <input
-                type="text"
-                v-model="form.name"
-                class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
-                required
-            >
-            <p v-if="form.errors.name" class="mt-1 text-sm text-red-600">{{ form.errors.name }}</p>
-        </div>
-
-        <!-- Email -->
-        <div>
-            <label class="block text-sm font-medium text-gray-700">Email</label>
-            <input
-                type="email"
-                v-model="form.email"
-                class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
-            >
-            <p v-if="form.errors.email" class="mt-1 text-sm text-red-600">{{ form.errors.email }}</p>
-        </div>
-
-        <!-- Phone -->
-        <div>
-            <label class="block text-sm font-medium text-gray-700">Phone</label>
-            <input
-                type="tel"
-                v-model="form.phone"
-                class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
-            >
-            <p v-if="form.errors.phone" class="mt-1 text-sm text-red-600">{{ form.errors.phone }}</p>
-        </div>
-
-        <!-- Address -->
-        <div>
-            <label class="block text-sm font-medium text-gray-700">Address</label>
-            <textarea
-                v-model="form.address"
-                rows="3"
-                class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
-            ></textarea>
-            <p v-if="form.errors.address" class="mt-1 text-sm text-red-600">{{ form.errors.address }}</p>
-        </div>
-
-        <!-- Status -->
-        <div>
-            <div class="flex items-center">
-                <input
-                    type="checkbox"
-                    v-model="form.is_active"
-                    class="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
-                >
-                <label class="ml-2 block text-sm text-gray-900">Active</label>
-            </div>
-            <p v-if="form.errors.is_active" class="mt-1 text-sm text-red-600">{{ form.errors.is_active }}</p>
-        </div>
-
-        <!-- Submit Button -->
-        <div class="flex justify-end">
+        <div class="px-4 py-3 bg-gray-50 text-right sm:px-6">
             <button
                 type="submit"
+                class="inline-flex justify-center rounded-md border border-transparent bg-indigo-600 py-2 px-4 text-sm font-medium text-white shadow-sm hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
                 :disabled="form.processing"
-                class="inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
             >
-                {{ mode === 'create' ? 'Create School' : 'Update School' }}
+                Save Changes
             </button>
         </div>
     </form>
-</template> 
+</template>

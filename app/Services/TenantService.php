@@ -10,33 +10,64 @@ class TenantService
 {
     public function getUsageStats(Tenant $tenant): array
     {
-        $storageUsed = Storage::size("tenants/{$tenant->id}") ?? 0;
-        $storageLimit = config('tenant.storage_limit', 1024 * 1024 * 1024); // 1GB default
+        try {
+            // Check if tenant directory exists
+            $tenantPath = "tenants/{$tenant->id}";
+            if (!Storage::exists($tenantPath)) {
+                return [
+                    'storage_used' => '0 B',
+                    'file_count' => 0,
+                    'last_activity' => $tenant->updated_at?->diffForHumans() ?? 'Never'
+                ];
+            }
 
-        $activeUsers = $tenant->users()->where('is_active', true)->count();
-        $totalUsers = $tenant->users()->count();
+            // Get all files recursively
+            $files = Storage::allFiles($tenantPath);
+            
+            $totalSize = 0;
+            foreach ($files as $file) {
+                try {
+                    $totalSize += Storage::size($file);
+                } catch (\Exception $e) {
+                    continue;
+                }
+            }
 
-        $activeStudents = $tenant->students()->where('status', 'active')->count();
-        $totalStudents = $tenant->students()->count();
+            return [
+                'storage_used' => $this->formatSize($totalSize),
+                'file_count' => count($files),
+                'last_activity' => $tenant->updated_at?->diffForHumans() ?? 'Never'
+            ];
+        } catch (\Exception $e) {
+            return [
+                'storage_used' => '0 B',
+                'file_count' => 0,
+                'last_activity' => $tenant->updated_at?->diffForHumans() ?? 'Never'
+            ];
+        }
+    }
 
+    public function getTenantStats(Tenant $tenant): array
+    {
         return [
-            'storage' => [
-                'used' => $storageUsed,
-                'total' => $storageLimit,
-                'percentage' => $storageLimit > 0 ? round(($storageUsed / $storageLimit) * 100) : 0
-            ],
-            'users' => [
-                'active' => $activeUsers,
-                'total' => $totalUsers,
-                'percentage' => $totalUsers > 0 ? round(($activeUsers / $totalUsers) * 100) : 0
-            ],
-            'students' => [
-                'active' => $activeStudents,
-                'total' => $totalStudents,
-                'percentage' => $totalStudents > 0 ? round(($activeStudents / $totalStudents) * 100) : 0
-            ],
-            'last_activity' => $tenant->last_activity_at
+            'subscription_status' => $tenant->subscription?->status ?? 'No subscription',
+            'subscription_ends' => $tenant->subscription?->ends_at?->format('Y-m-d') ?? 'N/A',
+            'created_at' => $tenant->created_at->format('Y-m-d'),
+            'domain' => $tenant->domain,
+            'admin_email' => $tenant->admin?->email ?? 'No admin',
+            'is_active' => $tenant->status === 'active'
         ];
+    }
+
+    private function formatSize(int $bytes): string
+    {
+        $units = ['B', 'KB', 'MB', 'GB', 'TB'];
+        $bytes = max($bytes, 0);
+        $pow = floor(($bytes ? log($bytes) : 0) / log(1024));
+        $pow = min($pow, count($units) - 1);
+        $bytes /= pow(1024, $pow);
+
+        return round($bytes, 2) . ' ' . $units[$pow];
     }
 
     public function create(array $data): Tenant
@@ -111,54 +142,5 @@ class TenantService
 
         // Delete the tenant (soft delete)
         $tenant->delete();
-    }
-
-    public function getClassStats(Tenant $tenant): array
-    {
-        $classes = $tenant->classes;
-        $totalStudents = $tenant->students()->count();
-        $averageClassSize = $classes->count() > 0 
-            ? round($totalStudents / $classes->count(), 1) 
-            : 0;
-
-        return [
-            'total_classes' => $classes->count(),
-            'total_students' => $totalStudents,
-            'average_class_size' => $averageClassSize,
-            'classes_with_teachers' => $tenant->classes()->has('teacher')->count(),
-            'active_classes' => $tenant->classes()->where('is_active', true)->count()
-        ];
-    }
-
-    public function getStudentStats(Tenant $tenant): array
-    {
-        $totalStudents = $tenant->students()->count();
-        $activeStudents = $tenant->students()->where('status', 'active')->count();
-        
-        return [
-            'total' => $totalStudents,
-            'active' => $activeStudents,
-            'with_guardians' => $tenant->students()->has('guardians')->count(),
-            'attendance_rate' => $this->calculateAttendanceRate($tenant),
-            'gender_distribution' => [
-                'male' => $tenant->students()->where('gender', 'male')->count(),
-                'female' => $tenant->students()->where('gender', 'female')->count()
-            ]
-        ];
-    }
-
-    private function calculateAttendanceRate(Tenant $tenant): float
-    {
-        $lastMonth = now()->subMonth();
-        $attendances = $tenant->attendances()
-            ->where('date', '>=', $lastMonth)
-            ->get();
-
-        if ($attendances->isEmpty()) {
-            return 0;
-        }
-
-        $present = $attendances->where('status', 'present')->count();
-        return round(($present / $attendances->count()) * 100, 1);
     }
 } 

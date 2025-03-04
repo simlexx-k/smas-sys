@@ -211,64 +211,64 @@ const breadcrumbs: BreadcrumbItem[] = [
                 <div class="flex justify-between items-center">
                     <h2 class="text-xl font-semibold text-gray-900">
                         Subscription Actions
-                    </h2>
-                    <div class="flex space-x-3">
-                        <button
-                            v-if="subscription.status === 'active'"
-                            @click="showCancelModal = true"
-                            class="inline-flex items-center px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700"
-                        >
-                            Cancel Subscription
-                        </button>
-                        <button
-                            v-if="['expired', 'cancelled'].includes(subscription.status)"
-                            @click="showRenewModal = true"
-                            class="inline-flex items-center px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700"
-                        >
-                            Renew Subscription
-                        </button>
+                </h2>
+                <div class="flex space-x-3">
+                    <button
+                        v-if="subscription.status === 'active'"
+                        @click="showCancelModal = true"
+                        class="inline-flex items-center px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700"
+                    >
+                        Cancel Subscription
+                    </button>
+                    <button
+                        v-if="['expired', 'cancelled'].includes(subscription.status)"
+                        @click="showRenewModal = true"
+                        class="inline-flex items-center px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700"
+                    >
+                        Renew Subscription
+                    </button>
+                            </div>
+                        </div>
                     </div>
                 </div>
-            </div>
-        </div>
 
-        <!-- Subscription Details Form -->
-        <div class="bg-white shadow sm:rounded-lg">
-            <div class="px-4 py-5 sm:p-6">
-                <form @submit.prevent="updateSubscription">
-                    <div class="grid grid-cols-1 gap-6 sm:grid-cols-2">
-                        <div>
-                            <label class="block text-sm font-medium text-gray-700">Plan</label>
-                            <select
-                                v-model="form.plan"
-                                class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
-                            >
-                                <option v-for="plan in availablePlans" :key="plan.id" :value="plan.id">
-                                    {{ plan.name }} - {{ formatPrice(plan.price) }}
-                                </option>
-                            </select>
-                        </div>
+                <!-- Subscription Details Form -->
+                <div class="bg-white shadow sm:rounded-lg">
+                    <div class="px-4 py-5 sm:p-6">
+                        <form @submit.prevent="updateSubscription">
+                            <div class="grid grid-cols-1 gap-6 sm:grid-cols-2">
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700">Plan</label>
+                                    <select
+                                        v-model="form.plan"
+                                        class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                                    >
+                                        <option v-for="plan in availablePlans" :key="plan.id" :value="plan.id">
+                                            {{ plan.name }} - {{ formatPrice(plan.price) }}
+                                        </option>
+                                    </select>
+                                </div>
 
-                        <div>
-                            <label class="block text-sm font-medium text-gray-700">End Date</label>
-                            <input
-                                type="date"
-                                v-model="form.ends_at"
-                                class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
-                            >
-                        </div>
-                    </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700">End Date</label>
+                                    <input
+                                        type="date"
+                                        v-model="form.ends_at"
+                                        class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                                    >
+                                </div>
+                            </div>
 
-                    <div class="mt-6 flex justify-end">
-                        <button
-                            type="submit"
-                            :disabled="form.processing"
-                            class="inline-flex items-center px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700"
-                        >
-                            Update Subscription
-                        </button>
-                    </div>
-                </form>
+                            <div class="mt-6 flex justify-end">
+                                <button
+                                    type="submit"
+                                    :disabled="form.processing"
+                                    class="inline-flex items-center px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700"
+                                >
+                                    Update Subscription
+                                </button>
+                            </div>
+                        </form>
             </div>
         </div>
 
