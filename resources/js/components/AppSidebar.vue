@@ -83,6 +83,12 @@ const mainNavItems: NavItem[] = [
             href: '/report-cards',
             icon: BookOpen,
         }
+    ] : page.props.auth.user?.role === 'teacher' ? [
+        {
+            title: 'Students',
+            href: '/students',
+            icon: SchoolIcon,
+        }
     ] : []),
 ];
 

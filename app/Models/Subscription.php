@@ -7,6 +7,8 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 use App\Traits\LogsActivity;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use App\Models\Activity;
+use Illuminate\Support\Facades\DB;
+use App\Http\Controllers\Admin\InvoiceController;
 
 class Subscription extends Model
 {
@@ -44,25 +46,29 @@ class Subscription extends Model
             ? $this->ends_at->addDays($duration)
             : $now->addDays($duration);
 
-        $this->update([
-            'status' => self::STATUS_ACTIVE,
-            'renewed_at' => $now,
-            'ends_at' => $newEndsAt,
-            'canceled_at' => null
-        ]);
+        DB::transaction(function () use ($now, $newEndsAt) {
+            $this->update([
+                'status' => self::STATUS_ACTIVE,
+                'renewed_at' => $now,
+                'ends_at' => $newEndsAt,
+                'canceled_at' => null
+            ]);
 
-        // Log the renewal
-        Activity::log(
-            'subscription',
-            'renew',
-            "Subscription renewed for {$this->tenant->name}",
-            $this,
-            [
-                'previous_end_date' => $this->getOriginal('ends_at'),
-                'new_end_date' => $newEndsAt,
-                'duration' => $duration
-            ]
-        );
+            // Generate new invoice
+            app(InvoiceController::class)->generateForSubscription($this);
+
+            Activity::log(
+                'subscription',
+                'renew',
+                "Subscription renewed for {$this->tenant->name}",
+                $this,
+                [
+                    'previous_end_date' => $this->getOriginal('ends_at'),
+                    'new_end_date' => $newEndsAt,
+                    'duration' => $duration
+                ]
+            );
+        });
 
         return $this;
     }
@@ -158,6 +164,11 @@ class Subscription extends Model
 
     public function plan(): BelongsTo
     {
-        return $this->belongsTo(Plan::class, 'plan_id');
+        return $this->belongsTo(Plan::class);
+    }
+
+    public function invoices()
+    {
+        return $this->hasMany(Invoice::class);
     }
 } 

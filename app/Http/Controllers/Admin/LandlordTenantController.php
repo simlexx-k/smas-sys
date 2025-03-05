@@ -22,6 +22,7 @@ use Maatwebsite\Excel\Facades\Excel;
 use Illuminate\Support\Facades\Storage;
 use Carbon\Carbon;
 use App\Models\Plan;
+use App\Models\Subscription;
 
 class LandlordTenantController extends Controller
 {
@@ -101,10 +102,76 @@ class LandlordTenantController extends Controller
 
     public function show(Tenant $tenant)
     {
-        $tenant->load(['subscription', 'admin']);
-        
+        \Log::info('Loading tenant data', ['tenant_id' => $tenant->id]);
+
+        // First get the active subscription
+        $activeSubscription = $tenant->subscriptions()
+            ->where('status', 'active')
+            ->with(['plan', 'invoices'])
+            ->first();
+
+        $tenant->load([
+            'subscriptions' => function ($query) use ($activeSubscription) {
+                $query->with(['plan', 'invoices'])
+                      ->where('status', '!=', 'active')
+                      ->when($activeSubscription, function ($q) use ($activeSubscription) {
+                          $q->where('id', '!=', $activeSubscription->id);
+                      })
+                      ->orderBy('ends_at', 'desc');
+            },
+        ]);
+
+        // Transform the data for the frontend
+        $tenantData = [
+            'id' => $tenant->id,
+            'name' => $tenant->name,
+            'email' => $tenant->email,
+            'logo_url' => $tenant->logo_url,
+            'created_at' => $tenant->created_at,
+            'is_active' => $tenant->status === 'active',
+            'status' => $tenant->status,
+            'school_type' => $tenant->school_type,
+            'subscription' => $activeSubscription ? [
+                'id' => $activeSubscription->id,
+                'status' => $activeSubscription->status,
+                'starts_at' => $activeSubscription->starts_at,
+                'ends_at' => $activeSubscription->ends_at,
+                'trial_ends_at' => $activeSubscription->trial_ends_at,
+                'price' => $activeSubscription->price,
+                'features' => $activeSubscription->features,
+                'payment_method' => $activeSubscription->payment_method,
+                'last_payment_at' => $activeSubscription->last_payment_at,
+                'next_payment_at' => $activeSubscription->next_payment_at,
+                'plan' => $activeSubscription->plan ? [
+                    'name' => $activeSubscription->plan->name,
+                    'slug' => $activeSubscription->plan->slug,
+                ] : null,
+                'invoices' => $activeSubscription->invoices ?? []
+            ] : null,
+            'past_subscriptions' => $tenant->subscriptions
+                ->map(function ($subscription) {
+                    return [
+                        'id' => $subscription->id,
+                        'status' => $subscription->status,
+                        'starts_at' => $subscription->starts_at,
+                        'ends_at' => $subscription->ends_at,
+                        'plan' => $subscription->plan ? [
+                            'name' => $subscription->plan->name,
+                            'slug' => $subscription->plan->slug,
+                        ] : null,
+                        'invoices' => $subscription->invoices ?? []
+                    ];
+                })->toArray()
+        ];
+
+        \Log::info('Transformed tenant data', [
+            'has_subscription_data' => isset($tenantData['subscription']),
+            'past_subscriptions_count' => count($tenantData['past_subscriptions']),
+            'data' => $tenantData
+        ]);
+
         return Inertia::render('Admin/Tenants/Show', [
-            'tenant' => $tenant,
+            'tenant' => $tenantData,
             'stats' => [
                 'usage' => $this->tenantService->getUsageStats($tenant),
                 'tenant' => $this->tenantService->getTenantStats($tenant)

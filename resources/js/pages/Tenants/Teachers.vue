@@ -7,6 +7,35 @@ import { Search, Download, PlusCircle, ChevronFirst, ChevronLeft, ChevronRight, 
 import jsPDF from 'jspdf';
 import 'jspdf-autotable';
 
+interface Teacher {
+    id: number;
+    name: string;
+    email: string;
+    status: string;
+    employee_id: string;
+    department: string;
+    subjects: string[];
+    joining_date: string;
+}
+
+interface Props {
+    tenant: {
+        id: number;
+        name: string;
+    };
+    teachers: Teacher[];
+    departments: string[];
+    subjects: Array<{
+        id: number;
+        name: string;
+    }>;
+}
+
+const props = withDefaults(defineProps<Props>(), {
+    departments: () => [],
+    subjects: () => []
+});
+
 const showForm = ref(false);
 const showExportMenu = ref(false);
 
@@ -17,16 +46,9 @@ const breadcrumbs = [
     },
 ];
 
-// Dummy data for teachers
-const teachers = ref([
-    { id: 1, name: 'Mr. John Smith', subject: 'Mathematics', email: 'john.smith@example.com', status: 'Active' },
-    { id: 2, name: 'Ms. Jane Doe', subject: 'Science', email: 'jane.doe@example.com', status: 'Inactive' },
-    { id: 3, name: 'Mrs. Alice Johnson', subject: 'English', email: 'alice.johnson@example.com', status: 'Active' },
-]);
-
 // Filters
 const searchQuery = ref('');
-const selectedSubject = ref('All');
+const selectedDepartment = ref('All');
 const statusFilter = ref('All');
 
 // Pagination
@@ -35,12 +57,12 @@ const currentPage = ref(1);
 
 // Computed properties for filtered and paginated data
 const filteredTeachers = computed(() => {
-    return teachers.value.filter(teacher => {
+    return props.teachers.filter(teacher => {
         const matchesSearch = teacher.name.toLowerCase().includes(searchQuery.value.toLowerCase()) ||
-                             teacher.email.toLowerCase().includes(searchQuery.value.toLowerCase());
-        const matchesSubject = selectedSubject.value === 'All' || teacher.subject === selectedSubject.value;
+                          teacher.email.toLowerCase().includes(searchQuery.value.toLowerCase());
+        const matchesDepartment = selectedDepartment.value === 'All' || teacher.department === selectedDepartment.value;
         const matchesStatus = statusFilter.value === 'All' || teacher.status === statusFilter.value;
-        return matchesSearch && matchesSubject && matchesStatus;
+        return matchesSearch && matchesDepartment && matchesStatus;
     });
 });
 
@@ -56,8 +78,16 @@ const totalPages = computed(() => {
 
 // Export functionality
 const exportToCSV = () => {
-    const headers = ['ID', 'Name', 'Subject', 'Email', 'Status'];
-    const rows = filteredTeachers.value.map(teacher => [teacher.id, teacher.name, teacher.subject, teacher.email, teacher.status]);
+    const headers = ['ID', 'Name', 'Email', 'Department', 'Subjects', 'Status', 'Joining Date'];
+    const rows = filteredTeachers.value.map(teacher => [
+        teacher.id,
+        teacher.name,
+        teacher.email,
+        teacher.department,
+        teacher.subjects.join(', '),
+        teacher.status,
+        teacher.joining_date
+    ]);
     const csvContent = [headers, ...rows].map(row => row.join(',')).join('\n');
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement('a');
@@ -71,16 +101,16 @@ const exportToPDF = () => {
     
     // Add title
     doc.setFontSize(18);
-    doc.text('Teacher List', 14, 22);
+    doc.text(`${props.tenant.name} - Teacher List`, 14, 22);
     
     // Prepare data for the table
-    const headers = [['ID', 'Name', 'Subject', 'Email', 'Status']];
+    const headers = [['ID', 'Name', 'Department', 'Status', 'Joining Date']];
     const data = filteredTeachers.value.map(teacher => [
         teacher.id,
         teacher.name,
-        teacher.subject,
-        teacher.email,
-        teacher.status
+        teacher.department,
+        teacher.status,
+        teacher.joining_date
     ]);
     
     // Add table
@@ -103,10 +133,9 @@ const exportToPDF = () => {
     doc.save('teachers.pdf');
 };
 
-// Subject options for filter
-const subjectOptions = computed(() => {
-    const subjects = new Set(teachers.value.map(teacher => teacher.subject));
-    return ['All', ...Array.from(subjects)];
+// Department options for filter
+const departmentOptions = computed(() => {
+    return ['All', ...(props.departments || [])];
 });
 
 // Status options for filter
@@ -153,8 +182,8 @@ const statusOptions = ['All', 'Active', 'Inactive'];
                         class="w-full pl-10 pr-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
                     />
                 </div>
-                <select v-model="selectedSubject" class="px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500">
-                    <option v-for="option in subjectOptions" :key="option" :value="option">
+                <select v-model="selectedDepartment" class="px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500">
+                    <option v-for="option in departmentOptions" :key="option" :value="option">
                         {{ option }}
                     </option>
                 </select>
@@ -174,16 +203,19 @@ const statusOptions = ['All', 'Active', 'Inactive'];
                         <tr>
                             <th class="p-3 text-left text-sm font-semibold text-gray-600">ID</th>
                             <th class="p-3 text-left text-sm font-semibold text-gray-600">Name</th>
-                            <th class="p-3 text-left text-sm font-semibold text-gray-600">Subject</th>
+                            <th class="p-3 text-left text-sm font-semibold text-gray-600">Department</th>
+                            <th class="p-3 text-left text-sm font-semibold text-gray-600">Subjects</th>
                             <th class="p-3 text-left text-sm font-semibold text-gray-600">Email</th>
                             <th class="p-3 text-left text-sm font-semibold text-gray-600">Status</th>
+                            <th class="p-3 text-left text-sm font-semibold text-gray-600">Joining Date</th>
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-gray-100">
                         <tr v-for="teacher in paginatedTeachers" :key="teacher.id" class="hover:bg-gray-50 transition-colors">
                             <td class="p-3 text-sm text-gray-700">{{ teacher.id }}</td>
                             <td class="p-3 text-sm text-gray-700">{{ teacher.name }}</td>
-                            <td class="p-3 text-sm text-gray-700">{{ teacher.subject }}</td>
+                            <td class="p-3 text-sm text-gray-700">{{ teacher.department }}</td>
+                            <td class="p-3 text-sm text-gray-700">{{ teacher.subjects.join(', ') }}</td>
                             <td class="p-3 text-sm text-gray-700">{{ teacher.email }}</td>
                             <td class="p-3">
                                 <span :class="{
@@ -194,6 +226,7 @@ const statusOptions = ['All', 'Active', 'Inactive'];
                                     {{ teacher.status }}
                                 </span>
                             </td>
+                            <td class="p-3 text-sm text-gray-700">{{ teacher.joining_date }}</td>
                         </tr>
                     </tbody>
                 </table>
@@ -246,7 +279,11 @@ const statusOptions = ['All', 'Active', 'Inactive'];
                         <X class="w-6 h-6" />
                     </button>
                     <h2 class="text-xl font-bold mb-6">Add New Teacher</h2>
-                    <TeacherForm @close="showForm = false" />
+                    <TeacherForm 
+                        :departments="departments"
+                        :subjects="subjects"
+                        @close="showForm = false" 
+                    />
                 </div>
             </div>
         </div>

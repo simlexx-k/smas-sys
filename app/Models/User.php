@@ -12,6 +12,9 @@ use App\Models\Tenant;
 class User extends Authenticatable
 {
     const ROLE_LANDLORD = 'landlord';
+    const ROLE_TENANT_ADMIN = 'tenant-admin';
+    const ROLE_TEACHER = 'teacher';
+    const ROLE_STUDENT = 'student';
 
     /** @use HasFactory<\Database\Factories\UserFactory> */
     use HasApiTokens, HasFactory, Notifiable;
@@ -60,6 +63,29 @@ class User extends Authenticatable
     public function tenant()
     {
         return $this->belongsTo(Tenant::class);
+    }
+
+    public function teacher()
+    {
+        return $this->hasOne(Teacher::class);
+    }
+
+    public function isTeacher(): bool
+    {
+        return $this->role === self::ROLE_TEACHER;
+    }
+
+    public function getAvailableRoles(): array
+    {
+        if ($this->role === self::ROLE_LANDLORD) {
+            return [self::ROLE_LANDLORD];
+        }
+
+        return [
+            self::ROLE_TENANT_ADMIN,
+            self::ROLE_TEACHER,
+            self::ROLE_STUDENT
+        ];
     }
 
     /**

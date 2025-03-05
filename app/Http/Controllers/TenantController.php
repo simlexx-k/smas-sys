@@ -11,6 +11,8 @@ use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 use App\Traits\TenantBindable;
+use App\Models\Lesson;
+use App\Models\Activity;
 
 class TenantController extends Controller
 {
@@ -169,8 +171,41 @@ class TenantController extends Controller
             return response()->json(['error' => 'Tenant not found'], 404);
         }
 
+        $teachers = $tenant->teachers()
+            ->with(['user', 'subjects'])
+            ->get()
+            ->map(function ($teacher) {
+                return [
+                    'id' => $teacher->id,
+                    'name' => $teacher->user->name,
+                    'email' => $teacher->user->email,
+                    'status' => $teacher->status,
+                    'employee_id' => $teacher->employee_id,
+                    'department' => $teacher->department,
+                    'subjects' => $teacher->subjects->pluck('name')->toArray(),
+                    'joining_date' => $teacher->joining_date
+                ];
+            });
+
+        // Get all subjects for the tenant
+        $subjects = $tenant->subjects()->get(['id', 'name'])->toArray();
+
+        // Get departments (optional)
+        $departments = $tenant->teachers()
+            ->whereNotNull('department')
+            ->distinct()
+            ->pluck('department')
+            ->values()
+            ->toArray();
+
         return Inertia::render('Tenants/Teachers', [
-            'tenant' => $tenant,
+            'tenant' => [
+                'id' => $tenant->id,
+                'name' => $tenant->name
+            ],
+            'teachers' => $teachers,
+            'departments' => $departments,
+            'subjects' => $subjects
         ]);
     }
 
@@ -466,5 +501,70 @@ class TenantController extends Controller
 
         $tenant->update($validated);
         return response()->json($tenant);
+    }
+
+    public function teacherDashboard()
+    {
+        $user = auth()->user();
+        $tenant = $user->tenant;
+        
+        if (!$tenant) {
+            abort(404, 'Tenant not found');
+        }
+
+        // Get teacher's classes with student counts
+        $classes = $tenant->getTeacherClasses($user);
+
+        // Get upcoming lessons with subject and class details
+        $upcomingLessons = Lesson::where('tenant_id', $tenant->id)
+            ->where('teacher_id', $user->teacher->id)
+            ->where('start_time', '>=', now())
+            ->with(['subject:id,name', 'class:id,name']) // Only select needed fields
+            ->orderBy('start_time', 'asc')
+            ->limit(5)
+            ->get()
+            ->map(function ($lesson) {
+                return [
+                    'id' => $lesson->id,
+                    'subject' => [
+                        'name' => $lesson->subject?->name ?? 'No Subject'
+                    ],
+                    'class' => [
+                        'name' => $lesson->class?->name ?? 'No Class'
+                    ],
+                    'start_time' => $lesson->start_time,
+                    'end_time' => $lesson->end_time,
+                    'status' => $lesson->status
+                ];
+            });
+
+        // Get recent activities
+        $recentActivities = Activity::where('user_id', $user->id)
+            ->orWhere(function($query) use ($user) {
+                $query->where('subject_type', 'App\Models\Teacher')
+                      ->where('subject_id', $user->teacher->id);
+            })
+            ->orderBy('created_at', 'desc')
+            ->limit(5)
+            ->get()
+            ->map(function ($activity) {
+                return [
+                    'id' => $activity->id,
+                    'type' => $activity->type,
+                    'description' => $activity->description,
+                    'created_at' => $activity->created_at
+                ];
+            });
+
+        return Inertia::render('Teacher/Dashboard', [
+            'tenant' => [
+                'id' => $tenant->id,
+                'name' => $tenant->name,
+            ],
+            'teacher' => $user->teacher,
+            'classes' => $classes,
+            'upcoming_lessons' => $upcomingLessons,
+            'recent_activities' => $recentActivities
+        ]);
     }
 }

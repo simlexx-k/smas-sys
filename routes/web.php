@@ -8,6 +8,11 @@ use App\Http\Controllers\LandlordDashboardController;
 use App\Http\Controllers\Admin\SubscriptionController;
 use App\Http\Controllers\Admin\PlanController;
 use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\Admin\InvoiceController;
+use App\Http\Controllers\Teacher\DashboardController as TeacherDashboardController;
+use App\Http\Controllers\Teacher\ClassController as TeacherClassController;
+use App\Http\Controllers\Teacher\AttendanceController as TeacherAttendanceController;
+use App\Http\Controllers\TeacherController;
 
 // Public routes
 Route::get('/', function () {
@@ -90,6 +95,10 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
         Route::delete('/tenants/{tenant}', [LandlordTenantController::class, 'destroy'])
             ->name('tenants.destroy');
+
+        // Invoice routes
+        Route::get('invoices/{invoice}/download', [InvoiceController::class, 'download'])
+            ->name('invoices.download');
     });
 
     // Tenant admin routes
@@ -114,6 +123,33 @@ Route::middleware(['auth', 'verified'])->group(function () {
             Route::get('/school', [TenantController::class, 'settings'])->name('settings.school');
             Route::put('/school', [TenantController::class, 'updateSettings'])->name('settings.school.update');
         });
+
+        // Teacher management routes
+        Route::prefix('teachers')->name('tenant.teachers.')->group(function () {
+            Route::get('/', [TenantController::class, 'teachers'])->name('index');
+            Route::post('/', [TeacherController::class, 'store'])->name('store');
+            Route::get('/{teacher}', [TeacherController::class, 'show'])->name('show');
+            Route::put('/{teacher}', [TeacherController::class, 'update'])->name('update');
+            Route::delete('/{teacher}', [TeacherController::class, 'destroy'])->name('destroy');
+        });
+    });
+
+    // Teacher routes
+    Route::middleware(['auth', 'role:teacher'])->prefix('teacher')->name('teacher.')->group(function () {
+        Route::get('/dashboard', [TeacherDashboardController::class, 'index'])
+            ->name('dashboard');
+        
+        Route::get('/classes', [TeacherClassController::class, 'index'])
+            ->name('classes.index');
+        
+        Route::get('/classes/{class}', [TeacherClassController::class, 'show'])
+            ->name('classes.show');
+        
+        Route::get('/classes/{class}/attendance', [TeacherAttendanceController::class, 'create'])
+            ->name('attendance.create');
+        
+        Route::post('/classes/{class}/attendance', [TeacherAttendanceController::class, 'store'])
+            ->name('attendance.store');
     });
 });
 

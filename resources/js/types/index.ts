@@ -30,17 +30,21 @@ export interface SharedData {
     };
 }
 
+export type UserRole = 'landlord' | 'tenant-admin' | 'teacher';
+
 export interface User {
     id: number;
     name: string;
     email: string;
-    role: 'landlord' | 'tenant-admin' | 'user';
+    role: UserRole;
+    tenant_id?: number;
 }
 
 export interface PageProps extends InertiaPageProps {
     auth: {
         user: User;
     };
+    tenant?: Tenant;
     [key: string]: any;
 }
 

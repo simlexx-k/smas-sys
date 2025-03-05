@@ -21,6 +21,8 @@ class DashboardController extends Controller
                 return redirect()->route('landlord.dashboard');
             case 'tenant-admin':
                 return redirect()->route('tenant.dashboard');
+            case 'teacher':
+                return redirect()->route('teacher.dashboard');
             default:
                 return Inertia::render('Dashboard', [
                     'message' => 'Welcome to your dashboard!'

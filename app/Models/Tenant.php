@@ -231,4 +231,50 @@ class Tenant extends Model
     {
         return $this->hasMany(Student::class);
     }
+
+    public function teachers()
+    {
+        return $this->hasMany(Teacher::class);
+    }
+    public function subjects(): HasMany
+    {
+        return $this->hasMany(Subject::class);
+    }
+    public function users()
+    {
+        return $this->hasMany(User::class);
+    }
+
+    public function teacherUsers()
+    {
+        return $this->users()->where('role', User::ROLE_TEACHER);
+    }
+
+    // Add this method to get all classes for a specific teacher
+    public function getTeacherClasses(User $teacher)
+    {
+        return $this->classes()
+            ->whereHas('teachers', function ($query) use ($teacher) {
+                $query->where('teacher_id', $teacher->teacher->id);
+            })
+            ->with(['students'])
+            ->get();
+    }
+
+    // Add this method to get upcoming lessons for a teacher
+    public function getTeacherUpcomingLessons(User $teacher)
+    {
+        return $this->classes()
+            ->whereHas('teachers', function ($query) use ($teacher) {
+                $query->where('teacher_id', $teacher->teacher->id);
+            })
+            ->with(['lessons' => function ($query) {
+                $query->where('start_time', '>', now())
+                      ->orderBy('start_time', 'asc')
+                      ->limit(5);
+            }])
+            ->get()
+            ->pluck('lessons')
+            ->flatten();
+    }
 }

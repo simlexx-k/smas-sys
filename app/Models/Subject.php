@@ -3,13 +3,25 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 
 class Subject extends Model
 {
-    protected $fillable = ['tenant_id', 'name', 'code', 'description', 'class_id'];
+    protected $fillable = [
+        'name',
+        'code',
+        'description',
+        'tenant_id'
+    ];
 
-    public function schoolClass()
+    public function tenant(): BelongsTo
     {
-        return $this->belongsTo(SchoolClass::class);
+        return $this->belongsTo(Tenant::class);
+    }
+
+    public function teachers(): BelongsToMany
+    {
+        return $this->belongsToMany(Teacher::class);
     }
 }

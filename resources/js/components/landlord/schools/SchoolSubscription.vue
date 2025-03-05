@@ -1,19 +1,39 @@
 <script setup lang="ts">
+interface Invoice {
+    id: number;
+    number: string;
+    amount: string;
+    status: string;
+    billing_period_start: string;
+    billing_period_end: string;
+    paid_at: string | null;
+    payment_method: string | null;
+    total: string;
+}
+
+interface Subscription {
+    id: number;
+    status: string;
+    starts_at: string;
+    ends_at: string;
+    trial_ends_at: string;
+    price: string;
+    features: string;
+    payment_method: string;
+    last_payment_at: string | null;
+    next_payment_at: string | null;
+    cancels_at: string | null;
+    invoices: Invoice[];
+    plan: {
+        name: string;
+        slug: string;
+    };
+}
+
 interface Props {
     tenant: {
-        subscription?: {
-            id: number;
-            status: string;
-            starts_at: string;
-            ends_at: string;
-            trial_ends_at: string;
-            price: string;
-            features: string;
-            payment_method: string;
-            last_payment_at: string | null;
-            next_payment_at: string | null;
-            cancels_at: string | null;
-        };
+        subscription?: Subscription;
+        past_subscriptions?: Subscription[];
         subscription_plan: string;
     };
 }
@@ -36,6 +56,16 @@ const parseFeatures = (features: string | undefined) => {
     } catch {
         return [];
     }
+};
+
+const getStatusColor = (status: string) => {
+    const colors = {
+        'paid': 'bg-green-100 text-green-800',
+        'pending': 'bg-yellow-100 text-yellow-800',
+        'overdue': 'bg-red-100 text-red-800',
+        'canceled': 'bg-gray-100 text-gray-800'
+    };
+    return colors[status] || 'bg-gray-100 text-gray-800';
 };
 </script>
 
@@ -111,45 +141,112 @@ const parseFeatures = (features: string | undefined) => {
                 <div class="mt-2 max-w-xl text-sm text-gray-500">
                     <p>View your billing history and download invoices.</p>
                 </div>
-                <div class="mt-4">
-                    <div class="flex flex-col">
-                        <div class="-my-2 overflow-x-auto sm:-mx-6 lg:-mx-8">
-                            <div class="py-2 align-middle inline-block min-w-full sm:px-6 lg:px-8">
-                                <div class="shadow overflow-hidden border-b border-gray-200 sm:rounded-lg">
-                                    <table class="min-w-full divide-y divide-gray-200">
-                                        <thead class="bg-gray-50">
-                                            <tr>
-                                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
-                                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Amount</th>
-                                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-                                                <th scope="col" class="relative px-6 py-3">
-                                                    <span class="sr-only">Invoice</span>
-                                                </th>
-                                            </tr>
-                                        </thead>
-                                        <tbody class="bg-white divide-y divide-gray-200">
-                                            <tr>
-                                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                                    {{ formatDate(tenant.subscription?.last_payment_at) }}
-                                                </td>
-                                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                                                    ${{ tenant.subscription?.price }}
-                                                </td>
-                                                <td class="px-6 py-4 whitespace-nowrap">
-                                                    <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">
-                                                        Paid
-                                                    </span>
-                                                </td>
-                                                <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                                                    <a href="#" class="text-indigo-600 hover:text-indigo-900">Download</a>
-                                                </td>
-                                            </tr>
-                                        </tbody>
-                                    </table>
+                
+                <!-- Current Subscription Invoices -->
+                <div v-if="tenant.subscription?.invoices?.length" class="mt-6">
+                    <h4 class="text-sm font-medium text-gray-900 mb-4">Current Subscription</h4>
+                    <div class="overflow-hidden shadow ring-1 ring-black ring-opacity-5 sm:rounded-lg">
+                        <table class="min-w-full divide-y divide-gray-300">
+                            <thead class="bg-gray-50">
+                                <tr>
+                                    <th scope="col" class="py-3.5 pl-4 pr-3 text-left text-sm font-semibold text-gray-900">Invoice Number</th>
+                                    <th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Period</th>
+                                    <th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Amount</th>
+                                    <th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Status</th>
+                                    <th scope="col" class="relative py-3.5 pl-3 pr-4 sm:pr-6">
+                                        <span class="sr-only">Actions</span>
+                                    </th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-gray-200 bg-white">
+                                <tr v-for="invoice in tenant.subscription.invoices" :key="invoice.id">
+                                    <td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm text-gray-900">{{ invoice.number }}</td>
+                                    <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
+                                        {{ formatDate(invoice.billing_period_start) }} - {{ formatDate(invoice.billing_period_end) }}
+                                    </td>
+                                    <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-900">${{ invoice.total }}</td>
+                                    <td class="whitespace-nowrap px-3 py-4 text-sm">
+                                        <span :class="[getStatusColor(invoice.status), 'px-2 inline-flex text-xs leading-5 font-semibold rounded-full']">
+                                            {{ invoice.status }}
+                                        </span>
+                                    </td>
+                                    <td class="relative whitespace-nowrap py-4 pl-3 pr-4 text-right text-sm font-medium sm:pr-6">
+                                        <a 
+                                            :href="`/admin/invoices/${invoice.id}/download`"
+                                            class="text-indigo-600 hover:text-indigo-900"
+                                            target="_blank"
+                                        >
+                                            Download PDF
+                                        </a>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Past Subscriptions -->
+                <div v-if="tenant.past_subscriptions?.length" class="mt-8">
+                    <h4 class="text-sm font-medium text-gray-900 mb-4">Past Subscriptions</h4>
+                    <div v-for="subscription in tenant.past_subscriptions" :key="subscription.id" class="mb-8">
+                        <div class="bg-gray-50 px-4 py-3 rounded-t-lg border-b border-gray-200">
+                            <div class="flex items-center justify-between">
+                                <div>
+                                    <h5 class="text-sm font-medium text-gray-900">{{ subscription.plan.name }}</h5>
+                                    <p class="text-xs text-gray-500">
+                                        {{ formatDate(subscription.starts_at) }} - {{ formatDate(subscription.ends_at) }}
+                                    </p>
                                 </div>
+                                <span :class="[getStatusColor(subscription.status), 'px-2 inline-flex text-xs leading-5 font-semibold rounded-full']">
+                                    {{ subscription.status }}
+                                </span>
                             </div>
                         </div>
+                        
+                        <div class="overflow-hidden shadow ring-1 ring-black ring-opacity-5">
+                            <table class="min-w-full divide-y divide-gray-300">
+                                <thead class="bg-gray-50">
+                                    <tr>
+                                        <th scope="col" class="py-3.5 pl-4 pr-3 text-left text-sm font-semibold text-gray-900">Invoice Number</th>
+                                        <th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Period</th>
+                                        <th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Amount</th>
+                                        <th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Status</th>
+                                        <th scope="col" class="relative py-3.5 pl-3 pr-4 sm:pr-6">
+                                            <span class="sr-only">Actions</span>
+                                        </th>
+                                    </tr>
+                                </thead>
+                                <tbody class="divide-y divide-gray-200 bg-white">
+                                    <tr v-for="invoice in subscription.invoices" :key="invoice.id">
+                                        <td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm text-gray-900">{{ invoice.number }}</td>
+                                        <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
+                                            {{ formatDate(invoice.billing_period_start) }} - {{ formatDate(invoice.billing_period_end) }}
+                                        </td>
+                                        <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-900">${{ invoice.total }}</td>
+                                        <td class="whitespace-nowrap px-3 py-4 text-sm">
+                                            <span :class="[getStatusColor(invoice.status), 'px-2 inline-flex text-xs leading-5 font-semibold rounded-full']">
+                                                {{ invoice.status }}
+                                            </span>
+                                        </td>
+                                        <td class="relative whitespace-nowrap py-4 pl-3 pr-4 text-right text-sm font-medium sm:pr-6">
+                                            <a 
+                                                :href="`/admin/invoices/${invoice.id}/download`"
+                                                class="text-indigo-600 hover:text-indigo-900"
+                                                target="_blank"
+                                            >
+                                                Download PDF
+                                            </a>
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
                     </div>
+                </div>
+
+                <!-- No Billing History -->
+                <div v-if="!tenant.subscription?.invoices?.length && !tenant.past_subscriptions?.length" class="mt-6">
+                    <p class="text-sm text-gray-500 italic">No billing history available.</p>
                 </div>
             </div>
         </div>
