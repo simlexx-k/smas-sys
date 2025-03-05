@@ -172,6 +172,7 @@ const props = withDefaults(defineProps<Props>(), {
         status: ''
     })
 });
+console.log('LandlordDashboardContent props:', props);
 
 const search = ref(props.filters?.search || '');
 const status = ref(props.filters?.status || '');

@@ -8,6 +8,7 @@ import { type BreadcrumbItem } from '@/types';
 import { Head } from '@inertiajs/vue3';
 import debounce from 'lodash/debounce';
 import Pagination from '@/components/Pagination.vue';
+import DeletedSchoolsWidget from '@/components/landlord/DeletedSchoolsWidget.vue';
 
 const page = usePage<PageProps>();
 
@@ -117,12 +118,29 @@ const formatCurrency = (amount: number) => {
 const safeStats = computed(() => ({
     ...page.props.stats
 }));
+
+const props = defineProps<{
+    stats: any;
+    systemStatus: any;
+    activities: any;
+    filters: any;
+    recentlyDeleted: {
+        id: number;
+        name: string;
+        deleted_at: string;
+    }[];
+    totalDeleted: number;
+}>();
+
+console.log('Dashboard props:', props);
+
+console.log('Landlord Dashboard page props:', page.props);
 </script>
 
 <template>
     <Head title="Landlord Dashboard" />
 
-    <AppLayout :breadcrumbs="breadcrumbs">
+    <AppLayout>
         <template #header>
             <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
                 <div>
@@ -169,327 +187,341 @@ const safeStats = computed(() => ({
 
         <!-- Content -->
         <div class="py-6">
-            <div class="max-w-7xl mx-auto sm:px-6 lg:px-8">
-                <!-- Error Alert -->
-                <div v-if="page.props.error" class="mb-6">
-                    <div class="bg-red-50 border-l-4 border-red-400 p-4">
-                        <div class="flex">
-                            <div class="flex-shrink-0">
-                                <svg class="h-5 w-5 text-red-400" viewBox="0 0 20 20" fill="currentColor">
-                                    <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd" />
-                                </svg>
-                            </div>
-                            <div class="ml-3">
-                                <p class="text-sm text-red-700">{{ page.props.error }}</p>
+            <div class="max-w-7xl mx-auto px-4 sm:px-6 md:px-8">
+                <!-- Main content grid -->
+                <div class="grid grid-cols-1 gap-4 lg:grid-cols-3">
+                    <!-- Main content (2 columns) -->
+                    <div class="lg:col-span-2">
+                        <!-- Error Alert -->
+                        <div v-if="page.props.error" class="mb-6">
+                            <div class="bg-red-50 border-l-4 border-red-400 p-4">
+                                <div class="flex">
+                                    <div class="flex-shrink-0">
+                                        <svg class="h-5 w-5 text-red-400" viewBox="0 0 20 20" fill="currentColor">
+                                            <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd" />
+                                        </svg>
+                                    </div>
+                                    <div class="ml-3">
+                                        <p class="text-sm text-red-700">{{ page.props.error }}</p>
+                                    </div>
+                                </div>
                             </div>
                         </div>
-                    </div>
-                </div>
 
-                <!-- Tab Content -->
-                <div class="space-y-6">
-                    <!-- Overview Tab -->
-                    <div v-show="activeTab === 'overview'" class="space-y-6">
-                        <!-- Stats Grid -->
-                        <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
-                            <div class="bg-white rounded-lg shadow p-6">
-                                <h3 class="text-lg font-medium text-gray-900">Total Schools</h3>
-                                <p class="mt-2 text-3xl font-semibold text-gray-900">{{ safeStats.total_tenants }}</p>
-                                <div class="mt-4">
-                                    <div class="flex items-center justify-between text-sm">
-                                        <span class="text-green-600">{{ safeStats.active_tenants }} Active</span>
-                                        <span class="text-red-600">{{ safeStats.tenants_without_subscription }} Without Subscription</span>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <!-- System Status -->
-                            <div class="bg-white rounded-lg shadow p-6">
-                                <h3 class="text-lg font-medium text-gray-900">System Status</h3>
-                                <div class="mt-4 space-y-3">
-                                    <div v-for="(status, service) in page.props.systemStatus" :key="service" class="flex justify-between">
-                                        <span class="text-sm text-gray-600 capitalize">{{ service }}</span>
-                                        <span :class="['text-sm font-medium', getStatusColor(status)]">{{ status }}</span>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <!-- Recent Activity -->
-                            <div class="bg-white rounded-lg shadow p-6">
-                                <h3 class="text-lg font-medium text-gray-900">Recent Activity</h3>
-                                <div class="mt-4 flow-root">
-                                    <ul class="-mb-8">
-                                        <li v-for="activity in page.props.activities.data.slice(0, 3)" :key="activity.id" class="relative pb-8">
-                                            <div class="relative flex space-x-3">
-                                                <div>
-                                                    <span class="h-8 w-8 rounded-full bg-gray-400 flex items-center justify-center ring-8 ring-white">
-                                                        <svg class="h-5 w-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" :d="getActivityIcon(activity.type)" />
-                                                        </svg>
-                                                    </span>
-                                                </div>
-                                                <div class="min-w-0 flex-1">
-                                                    <div>
-                                                        <div class="text-sm">
-                                                            <span class="font-medium text-gray-900">{{ activity.user.name }}</span>
-                                                            <span class="text-gray-500"> {{ activity.description }}</span>
-                                                        </div>
-                                                        <p class="mt-0.5 text-sm text-gray-500">
-                                                            {{ formatDate(activity.created_at) }}
-                                                        </p>
-                                                    </div>
-                                                </div>
+                        <!-- Tab Content -->
+                        <div class="space-y-6">
+                            <!-- Overview Tab -->
+                            <div v-show="activeTab === 'overview'" class="space-y-6">
+                                <!-- Stats Grid -->
+                                <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                                    <div class="bg-white rounded-lg shadow p-6">
+                                        <h3 class="text-lg font-medium text-gray-900">Total Schools</h3>
+                                        <p class="mt-2 text-3xl font-semibold text-gray-900">{{ safeStats.total_tenants }}</p>
+                                        <div class="mt-4">
+                                            <div class="flex items-center justify-between text-sm">
+                                                <span class="text-green-600">{{ safeStats.active_tenants }} Active</span>
+                                                <span class="text-red-600">{{ safeStats.tenants_without_subscription }} Without Subscription</span>
                                             </div>
-                                        </li>
-                                    </ul>
-                                </div>
-                            </div>
-                        </div>
+                                        </div>
+                                    </div>
 
-                        <!-- Subscription Health -->
-                        <div class="bg-white rounded-lg shadow p-6">
-                            <h3 class="text-lg font-medium text-gray-900 mb-4">Subscription Health</h3>
-                            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-                                <div class="bg-green-50 p-4 rounded-lg">
-                                    <h4 class="text-sm font-medium text-green-800">Active Rate</h4>
-                                    <p class="mt-2 text-2xl font-semibold text-green-900">
-                                        {{ Math.round(safeStats.subscription_health.active_rate) }}%
-                                    </p>
-                                </div>
-                                <div class="bg-red-50 p-4 rounded-lg">
-                                    <h4 class="text-sm font-medium text-red-800">Churn Rate</h4>
-                                    <p class="mt-2 text-2xl font-semibold text-red-900">
-                                        {{ Math.round(safeStats.subscription_health.churn_rate) }}%
-                                    </p>
-                                </div>
-                                <div class="bg-blue-50 p-4 rounded-lg">
-                                    <h4 class="text-sm font-medium text-blue-800">Renewal Rate</h4>
-                                    <p class="mt-2 text-2xl font-semibold text-blue-900">
-                                        {{ Math.round(safeStats.subscription_health.renewal_rate) }}%
-                                    </p>
-                                </div>
-                            </div>
-                        </div>
+                                    <!-- System Status -->
+                                    <div class="bg-white rounded-lg shadow p-6">
+                                        <h3 class="text-lg font-medium text-gray-900">System Status</h3>
+                                        <div class="mt-4 space-y-3">
+                                            <div v-for="(status, service) in page.props.systemStatus" :key="service" class="flex justify-between">
+                                                <span class="text-sm text-gray-600 capitalize">{{ service }}</span>
+                                                <span :class="['text-sm font-medium', getStatusColor(status)]">{{ status }}</span>
+                                            </div>
+                                        </div>
+                                    </div>
 
-                        <!-- Recent Schools -->
-                        <div class="bg-white rounded-lg shadow">
-                            <div class="p-6 border-b border-gray-200">
-                                <div class="flex items-center justify-between">
-                                    <h2 class="text-xl font-semibold text-gray-900">Recent Schools</h2>
-                                    <Link
-                                        href="/admin/tenants"
-                                        class="text-sm text-indigo-600 hover:text-indigo-900"
-                                    >
-                                        View All
-                                    </Link>
-                                </div>
-                            </div>
-                            <div class="overflow-x-auto">
-                                <table class="min-w-full divide-y divide-gray-200">
-                                    <thead class="bg-gray-50">
-                                        <tr>
-                                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                                School Name
-                                            </th>
-                                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                                Email
-                                            </th>
-                                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                                Joined
-                                            </th>
-                                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                                Actions
-                                            </th>
-                                        </tr>
-                                    </thead>
-                                    <tbody class="bg-white divide-y divide-gray-200">
-                                        <tr v-for="tenant in safeStats.recent_tenants.data" :key="tenant.id">
-                                            <td class="px-6 py-4 whitespace-nowrap">
-                                                <div class="flex items-center">
-                                                    <div class="flex-shrink-0 h-10 w-10">
-                                                        <img
-                                                            v-if="tenant.logo_url"
-                                                            :src="tenant.logo_url"
-                                                            :alt="tenant.name"
-                                                            class="h-10 w-10 rounded-full"
-                                                        >
-                                                        <div v-else class="h-10 w-10 rounded-full bg-gray-200 flex items-center justify-center">
-                                                            <span class="text-xl font-bold text-gray-600">
-                                                                {{ tenant.name.charAt(0) }}
+                                    <!-- Recent Activity -->
+                                    <div class="bg-white rounded-lg shadow p-6">
+                                        <h3 class="text-lg font-medium text-gray-900">Recent Activity</h3>
+                                        <div class="mt-4 flow-root">
+                                            <ul class="-mb-8">
+                                                <li v-for="activity in page.props.activities.data.slice(0, 3)" :key="activity.id" class="relative pb-8">
+                                                    <div class="relative flex space-x-3">
+                                                        <div>
+                                                            <span class="h-8 w-8 rounded-full bg-gray-400 flex items-center justify-center ring-8 ring-white">
+                                                                <svg class="h-5 w-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" :d="getActivityIcon(activity.type)" />
+                                                                </svg>
                                                             </span>
                                                         </div>
-                                                    </div>
-                                                    <div class="ml-4">
-                                                        <div class="text-sm font-medium text-gray-900">
-                                                            {{ tenant.name }}
+                                                        <div class="min-w-0 flex-1">
+                                                            <div>
+                                                                <div class="text-sm">
+                                                                    <span class="font-medium text-gray-900">{{ activity.user.name }}</span>
+                                                                    <span class="text-gray-500"> {{ activity.description }}</span>
+                                                                </div>
+                                                                <p class="mt-0.5 text-sm text-gray-500">
+                                                                    {{ formatDate(activity.created_at) }}
+                                                                </p>
+                                                            </div>
                                                         </div>
                                                     </div>
-                                                </div>
-                                            </td>
-                                            <td class="px-6 py-4 whitespace-nowrap">
-                                                <div class="text-sm text-gray-900">{{ tenant.email }}</div>
-                                            </td>
-                                            <td class="px-6 py-4 whitespace-nowrap">
-                                                <div class="text-sm text-gray-900">
-                                                    {{ formatDate(tenant.created_at) }}
-                                                </div>
-                                            </td>
-                                            <td class="px-6 py-4 whitespace-nowrap text-sm">
-                                                <Link
-                                                    :href="`/admin/tenants/${tenant.id}`"
-                                                    class="text-indigo-600 hover:text-indigo-900"
-                                                >
-                                                    View Details
-                                                </Link>
-                                            </td>
-                                        </tr>
-                                    </tbody>
-                                </table>
+                                                </li>
+                                            </ul>
+                                        </div>
+                                    </div>
+                                </div>
+                            
+                                <!-- Subscription Health -->
+                                <div class="bg-white rounded-lg shadow p-6">
+                                    <h3 class="text-lg font-medium text-gray-900 mb-4">Subscription Health</h3>
+                                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                        <div class="bg-green-50 p-4 rounded-lg">
+                                            <h4 class="text-sm font-medium text-green-800">Active Rate</h4>
+                                            <p class="mt-2 text-2xl font-semibold text-green-900">
+                                                {{ Math.round(safeStats.subscription_health.active_rate) }}%
+                                            </p>
+                                        </div>
+                                        <div class="bg-red-50 p-4 rounded-lg">
+                                            <h4 class="text-sm font-medium text-red-800">Churn Rate</h4>
+                                            <p class="mt-2 text-2xl font-semibold text-red-900">
+                                                {{ Math.round(safeStats.subscription_health.churn_rate) }}%
+                                            </p>
+                                        </div>
+                                        <div class="bg-blue-50 p-4 rounded-lg">
+                                            <h4 class="text-sm font-medium text-blue-800">Renewal Rate</h4>
+                                            <p class="mt-2 text-2xl font-semibold text-blue-900">
+                                                {{ Math.round(safeStats.subscription_health.renewal_rate) }}%
+                                            </p>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Recent Schools -->
+                                <div class="bg-white rounded-lg shadow">
+                                    <div class="p-6 border-b border-gray-200">
+                                        <div class="flex items-center justify-between">
+                                            <h2 class="text-xl font-semibold text-gray-900">Recent Schools</h2>
+                                            <Link
+                                                href="/admin/tenants"
+                                                class="text-sm text-indigo-600 hover:text-indigo-900"
+                                            >
+                                                View All
+                                            </Link>
+                                        </div>
+                                    </div>
+                                    <div class="overflow-x-auto">
+                                        <table class="min-w-full divide-y divide-gray-200">
+                                            <thead class="bg-gray-50">
+                                                <tr>
+                                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                                        School Name
+                                                    </th>
+                                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                                        Email
+                                                    </th>
+                                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                                        Joined
+                                                    </th>
+                                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                                        Actions
+                                                    </th>
+                                                </tr>
+                                            </thead>
+                                            <tbody class="bg-white divide-y divide-gray-200">
+                                                <tr v-for="tenant in safeStats.recent_tenants.data" :key="tenant.id">
+                                                    <td class="px-6 py-4 whitespace-nowrap">
+                                                        <div class="flex items-center">
+                                                            <div class="flex-shrink-0 h-10 w-10">
+                                                                <img
+                                                                    v-if="tenant.logo_url"
+                                                                    :src="tenant.logo_url"
+                                                                    :alt="tenant.name"
+                                                                    class="h-10 w-10 rounded-full"
+                                                                >
+                                                                <div v-else class="h-10 w-10 rounded-full bg-gray-200 flex items-center justify-center">
+                                                                    <span class="text-xl font-bold text-gray-600">
+                                                                        {{ tenant.name.charAt(0) }}
+                                                                    </span>
+                                                                </div>
+                                                            </div>
+                                                            <div class="ml-4">
+                                                                <div class="text-sm font-medium text-gray-900">
+                                                                    {{ tenant.name }}
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                    </td>
+                                                    <td class="px-6 py-4 whitespace-nowrap">
+                                                        <div class="text-sm text-gray-900">{{ tenant.email }}</div>
+                                                    </td>
+                                                    <td class="px-6 py-4 whitespace-nowrap">
+                                                        <div class="text-sm text-gray-900">
+                                                            {{ formatDate(tenant.created_at) }}
+                                                        </div>
+                                                    </td>
+                                                    <td class="px-6 py-4 whitespace-nowrap text-sm">
+                                                        <Link
+                                                            :href="`/admin/tenants/${tenant.id}`"
+                                                            class="text-indigo-600 hover:text-indigo-900"
+                                                        >
+                                                            View Details
+                                                        </Link>
+                                                    </td>
+                                                </tr>
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Subscriptions Tab -->
+                            <div v-show="activeTab === 'subscriptions'" class="space-y-6">
+                                <!-- Status Overview -->
+                                <div class="bg-white rounded-lg shadow p-6">
+                                    <h3 class="text-lg font-medium text-gray-900 mb-4">Subscription Status</h3>
+                                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                        <div class="bg-green-50 p-4 rounded-lg">
+                                            <h4 class="text-sm font-medium text-green-800">Active Subscriptions</h4>
+                                            <p class="mt-2 text-2xl font-semibold text-green-900">
+                                                {{ safeStats.status_breakdown.active }}
+                                            </p>
+                                        </div>
+                                        <div class="bg-yellow-50 p-4 rounded-lg">
+                                            <h4 class="text-sm font-medium text-yellow-800">Trial Subscriptions</h4>
+                                            <p class="mt-2 text-2xl font-semibold text-yellow-900">
+                                                {{ safeStats.status_breakdown.trial }}
+                                            </p>
+                                        </div>
+                                        <div class="bg-red-50 p-4 rounded-lg">
+                                            <h4 class="text-sm font-medium text-red-800">Expired Subscriptions</h4>
+                                            <p class="mt-2 text-2xl font-semibold text-red-900">
+                                                {{ safeStats.status_breakdown.expired }}
+                                            </p>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Subscription Alerts -->
+                                <div class="bg-white rounded-lg shadow p-6">
+                                    <h3 class="text-lg font-medium text-gray-900 mb-4">Subscription Alerts</h3>
+                                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                        <div class="bg-yellow-50 p-4 rounded-lg">
+                                            <h4 class="text-sm font-medium text-yellow-800">Expiring Soon</h4>
+                                            <p class="mt-2 text-2xl font-semibold text-yellow-900">
+                                                {{ safeStats.status_breakdown.expiring_soon }}
+                                            </p>
+                                            <p class="mt-1 text-sm text-yellow-600">
+                                                Subscriptions expiring in the next 30 days
+                                            </p>
+                                        </div>
+                                        <div class="bg-orange-50 p-4 rounded-lg">
+                                            <h4 class="text-sm font-medium text-orange-800">Canceling</h4>
+                                            <p class="mt-2 text-2xl font-semibold text-orange-900">
+                                                {{ safeStats.status_breakdown.canceling }}
+                                            </p>
+                                            <p class="mt-1 text-sm text-orange-600">
+                                                Active subscriptions scheduled for cancellation
+                                            </p>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Renewal Tracking -->
+                                <div class="bg-white rounded-lg shadow p-6">
+                                    <h3 class="text-lg font-medium text-gray-900 mb-4">Renewal Tracking</h3>
+                                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                        <div class="bg-blue-50 p-4 rounded-lg">
+                                            <h4 class="text-sm font-medium text-blue-800">Last 30 Days</h4>
+                                            <p class="mt-2 text-2xl font-semibold text-blue-900">
+                                                {{ safeStats.renewal_tracking.last_30_days }}
+                                            </p>
+                                            <p class="mt-1 text-sm text-blue-600">
+                                                New and renewed subscriptions
+                                            </p>
+                                        </div>
+                                        <div class="bg-indigo-50 p-4 rounded-lg">
+                                            <h4 class="text-sm font-medium text-indigo-800">Last 90 Days</h4>
+                                            <p class="mt-2 text-2xl font-semibold text-indigo-900">
+                                                {{ safeStats.renewal_tracking.last_90_days }}
+                                            </p>
+                                            <p class="mt-1 text-sm text-indigo-600">
+                                                New and renewed subscriptions
+                                            </p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Revenue Tab -->
+                            <div v-show="activeTab === 'revenue'" class="space-y-6">
+                                <!-- Revenue Overview -->
+                                <div class="bg-white rounded-lg shadow p-6">
+                                    <h3 class="text-lg font-medium text-gray-900 mb-4">Revenue Overview</h3>
+                                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                        <div class="bg-green-50 p-4 rounded-lg">
+                                            <h4 class="text-sm font-medium text-green-800">Monthly Recurring Revenue</h4>
+                                            <p class="mt-2 text-2xl font-semibold text-green-900">
+                                                {{ formatCurrency(safeStats.revenue_metrics.monthly_recurring_revenue) }}
+                                            </p>
+                                        </div>
+                                        <div class="bg-blue-50 p-4 rounded-lg">
+                                            <h4 class="text-sm font-medium text-blue-800">Average Revenue per Tenant</h4>
+                                            <p class="mt-2 text-2xl font-semibold text-blue-900">
+                                                {{ formatCurrency(safeStats.revenue_metrics.average_revenue_per_tenant) }}
+                                            </p>
+                                        </div>
+                                        <div class="bg-indigo-50 p-4 rounded-lg">
+                                            <h4 class="text-sm font-medium text-indigo-800">Projected Annual Revenue</h4>
+                                            <p class="mt-2 text-2xl font-semibold text-indigo-900">
+                                                {{ formatCurrency(safeStats.revenue_metrics.projected_annual_revenue) }}
+                                            </p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Metrics Tab -->
+                            <div v-show="activeTab === 'metrics'" class="space-y-6">
+                                <!-- Time Metrics -->
+                                <div class="bg-white rounded-lg shadow p-6">
+                                    <h3 class="text-lg font-medium text-gray-900 mb-4">Time-based Metrics</h3>
+                                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                        <div class="bg-purple-50 p-4 rounded-lg">
+                                            <h4 class="text-sm font-medium text-purple-800">Average Time to Conversion</h4>
+                                            <p class="mt-2 text-2xl font-semibold text-purple-900">
+                                                {{ Math.round(safeStats.time_metrics.average_time_to_conversion) }} days
+                                            </p>
+                                        </div>
+                                        <div class="bg-indigo-50 p-4 rounded-lg">
+                                            <h4 class="text-sm font-medium text-indigo-800">Average Subscription Age</h4>
+                                            <p class="mt-2 text-2xl font-semibold text-indigo-900">
+                                                {{ Math.round(safeStats.time_metrics.average_subscription_age) }} days
+                                            </p>
+                                        </div>
+                                        <div class="bg-blue-50 p-4 rounded-lg">
+                                            <h4 class="text-sm font-medium text-blue-800">Average Renewal Interval</h4>
+                                            <p class="mt-2 text-2xl font-semibold text-blue-900">
+                                                {{ Math.round(safeStats.renewal_tracking.average_renewal_interval) }} days
+                                            </p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Pagination sections -->
+                            <div v-if="safeStats.recent_tenants?.links?.length" class="mt-4">
+                                <Pagination :links="safeStats.recent_tenants.links" />
+                            </div>
+
+                            <div v-if="page.props.activities?.links?.length" class="mt-4">
+                                <Pagination :links="page.props.activities.links" />
                             </div>
                         </div>
                     </div>
 
-                    <!-- Subscriptions Tab -->
-                    <div v-show="activeTab === 'subscriptions'" class="space-y-6">
-                        <!-- Status Overview -->
-                        <div class="bg-white rounded-lg shadow p-6">
-                            <h3 class="text-lg font-medium text-gray-900 mb-4">Subscription Status</h3>
-                            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-                                <div class="bg-green-50 p-4 rounded-lg">
-                                    <h4 class="text-sm font-medium text-green-800">Active Subscriptions</h4>
-                                    <p class="mt-2 text-2xl font-semibold text-green-900">
-                                        {{ safeStats.status_breakdown.active }}
-                                    </p>
-                                </div>
-                                <div class="bg-yellow-50 p-4 rounded-lg">
-                                    <h4 class="text-sm font-medium text-yellow-800">Trial Subscriptions</h4>
-                                    <p class="mt-2 text-2xl font-semibold text-yellow-900">
-                                        {{ safeStats.status_breakdown.trial }}
-                                    </p>
-                                </div>
-                                <div class="bg-red-50 p-4 rounded-lg">
-                                    <h4 class="text-sm font-medium text-red-800">Expired Subscriptions</h4>
-                                    <p class="mt-2 text-2xl font-semibold text-red-900">
-                                        {{ safeStats.status_breakdown.expired }}
-                                    </p>
-                                </div>
-                            </div>
-                        </div>
-
-                        <!-- Subscription Alerts -->
-                        <div class="bg-white rounded-lg shadow p-6">
-                            <h3 class="text-lg font-medium text-gray-900 mb-4">Subscription Alerts</h3>
-                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                <div class="bg-yellow-50 p-4 rounded-lg">
-                                    <h4 class="text-sm font-medium text-yellow-800">Expiring Soon</h4>
-                                    <p class="mt-2 text-2xl font-semibold text-yellow-900">
-                                        {{ safeStats.status_breakdown.expiring_soon }}
-                                    </p>
-                                    <p class="mt-1 text-sm text-yellow-600">
-                                        Subscriptions expiring in the next 30 days
-                                    </p>
-                                </div>
-                                <div class="bg-orange-50 p-4 rounded-lg">
-                                    <h4 class="text-sm font-medium text-orange-800">Canceling</h4>
-                                    <p class="mt-2 text-2xl font-semibold text-orange-900">
-                                        {{ safeStats.status_breakdown.canceling }}
-                                    </p>
-                                    <p class="mt-1 text-sm text-orange-600">
-                                        Active subscriptions scheduled for cancellation
-                                    </p>
-                                </div>
-                            </div>
-                        </div>
-
-                        <!-- Renewal Tracking -->
-                        <div class="bg-white rounded-lg shadow p-6">
-                            <h3 class="text-lg font-medium text-gray-900 mb-4">Renewal Tracking</h3>
-                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                <div class="bg-blue-50 p-4 rounded-lg">
-                                    <h4 class="text-sm font-medium text-blue-800">Last 30 Days</h4>
-                                    <p class="mt-2 text-2xl font-semibold text-blue-900">
-                                        {{ safeStats.renewal_tracking.last_30_days }}
-                                    </p>
-                                    <p class="mt-1 text-sm text-blue-600">
-                                        New and renewed subscriptions
-                                    </p>
-                                </div>
-                                <div class="bg-indigo-50 p-4 rounded-lg">
-                                    <h4 class="text-sm font-medium text-indigo-800">Last 90 Days</h4>
-                                    <p class="mt-2 text-2xl font-semibold text-indigo-900">
-                                        {{ safeStats.renewal_tracking.last_90_days }}
-                                    </p>
-                                    <p class="mt-1 text-sm text-indigo-600">
-                                        New and renewed subscriptions
-                                    </p>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Revenue Tab -->
-                    <div v-show="activeTab === 'revenue'" class="space-y-6">
-                        <!-- Revenue Overview -->
-                        <div class="bg-white rounded-lg shadow p-6">
-                            <h3 class="text-lg font-medium text-gray-900 mb-4">Revenue Overview</h3>
-                            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-                                <div class="bg-green-50 p-4 rounded-lg">
-                                    <h4 class="text-sm font-medium text-green-800">Monthly Recurring Revenue</h4>
-                                    <p class="mt-2 text-2xl font-semibold text-green-900">
-                                        {{ formatCurrency(safeStats.revenue_metrics.monthly_recurring_revenue) }}
-                                    </p>
-                                </div>
-                                <div class="bg-blue-50 p-4 rounded-lg">
-                                    <h4 class="text-sm font-medium text-blue-800">Average Revenue per Tenant</h4>
-                                    <p class="mt-2 text-2xl font-semibold text-blue-900">
-                                        {{ formatCurrency(safeStats.revenue_metrics.average_revenue_per_tenant) }}
-                                    </p>
-                                </div>
-                                <div class="bg-indigo-50 p-4 rounded-lg">
-                                    <h4 class="text-sm font-medium text-indigo-800">Projected Annual Revenue</h4>
-                                    <p class="mt-2 text-2xl font-semibold text-indigo-900">
-                                        {{ formatCurrency(safeStats.revenue_metrics.projected_annual_revenue) }}
-                                    </p>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Metrics Tab -->
-                    <div v-show="activeTab === 'metrics'" class="space-y-6">
-                        <!-- Time Metrics -->
-                        <div class="bg-white rounded-lg shadow p-6">
-                            <h3 class="text-lg font-medium text-gray-900 mb-4">Time-based Metrics</h3>
-                            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-                                <div class="bg-purple-50 p-4 rounded-lg">
-                                    <h4 class="text-sm font-medium text-purple-800">Average Time to Conversion</h4>
-                                    <p class="mt-2 text-2xl font-semibold text-purple-900">
-                                        {{ Math.round(safeStats.time_metrics.average_time_to_conversion) }} days
-                                    </p>
-                                </div>
-                                <div class="bg-indigo-50 p-4 rounded-lg">
-                                    <h4 class="text-sm font-medium text-indigo-800">Average Subscription Age</h4>
-                                    <p class="mt-2 text-2xl font-semibold text-indigo-900">
-                                        {{ Math.round(safeStats.time_metrics.average_subscription_age) }} days
-                                    </p>
-                                </div>
-                                <div class="bg-blue-50 p-4 rounded-lg">
-                                    <h4 class="text-sm font-medium text-blue-800">Average Renewal Interval</h4>
-                                    <p class="mt-2 text-2xl font-semibold text-blue-900">
-                                        {{ Math.round(safeStats.renewal_tracking.average_renewal_interval) }} days
-                                    </p>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Pagination sections -->
-                    <div v-if="safeStats.recent_tenants?.links?.length" class="mt-4">
-                        <Pagination :links="safeStats.recent_tenants.links" />
-                    </div>
-
-                    <div v-if="page.props.activities?.links?.length" class="mt-4">
-                        <Pagination :links="page.props.activities.links" />
+                    <!-- Sidebar (1 column) -->
+                    <div>
+                        <DeletedSchoolsWidget
+                            :recently-deleted="props.recentlyDeleted"
+                            :total-deleted="props.totalDeleted"
+                        />
                     </div>
                 </div>
             </div>

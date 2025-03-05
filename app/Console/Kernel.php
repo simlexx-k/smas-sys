@@ -18,6 +18,12 @@ class Kernel extends ConsoleKernel
     protected function schedule(Schedule $schedule): void
     {
         $schedule->command('subscriptions:process-renewals')->daily();
+        // Run cleanup at midnight every day
+        $schedule->command('tenants:cleanup-expired')
+            ->daily()
+            ->at('00:00')
+            ->withoutOverlapping()
+            ->appendOutputTo(storage_path('logs/tenant-cleanup.log'));
     }
 
     /**

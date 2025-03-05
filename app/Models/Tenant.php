@@ -10,6 +10,10 @@ use Hashids\Hashids;
 use App\Traits\LogsActivity;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\Casts\Attribute;
+use Illuminate\Support\Facades\Storage;
+use App\Jobs\CleanupTenantData;
+use App\Notifications\TenantDeleted;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Tenant extends Model
 {
@@ -26,7 +30,8 @@ class Tenant extends Model
         'status',
         'subscription_plan',
         'subscription_ends_at',
-        'settings'
+        'settings',
+        'storage_used',
     ];
 
     protected $casts = [
@@ -43,6 +48,16 @@ class Tenant extends Model
     protected static function booted()
     {
         static::$hashids = new Hashids('a1b2c3d4e5f6g7h8i9j0k1l2m3n4o5p6q7r8s9t0u1v2w3x4y5z6', 8);
+
+        static::deleting(function ($tenant) {
+            Activity::logTenantDeletion($tenant);
+            
+            if (!$tenant->isForceDeleting()) {
+                // Only dispatch cleanup job for soft deletes
+                CleanupTenantData::dispatch($tenant->id)
+                    ->delay(now()->addMinutes(5));
+            }
+        });
     }
 
     public static function current()
@@ -195,5 +210,25 @@ class Tenant extends Model
                 }
             }
         });
+
+        static::restored(function ($tenant) {
+            Activity::log(
+                'tenant',
+                'restore',
+                "Restored school: {$tenant->name}",
+                $tenant
+            );
+        });
+    }
+
+    public function canBeRestored(): bool
+    {
+        return $this->deleted_at && 
+               $this->deleted_at->addDays(30)->isFuture();
+    }
+
+    public function students(): HasMany
+    {
+        return $this->hasMany(Student::class);
     }
 }

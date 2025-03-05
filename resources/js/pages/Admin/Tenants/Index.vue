@@ -14,6 +14,7 @@ interface Props {
         search?: string;
         status?: string;
     };
+    trashedCount: number;
 }
 
 // Add default values for props
@@ -42,11 +43,25 @@ const breadcrumbs: BreadcrumbItem[] = [
 
     <AppLayout :breadcrumbs="breadcrumbs">
         <template #header>
-            <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
+            <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                 <div>
                     <h2 class="text-xl font-semibold text-gray-900">Schools</h2>
                 </div>
                 <div class="flex items-center gap-2">
+                    <!-- Trash Link -->
+                    <Link
+                        :href="route('admin.tenants.trash')"
+                        class="inline-flex items-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50"
+                    >
+                        <svg class="-ml-1 mr-2 h-5 w-5 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                        </svg>
+                        Trash
+                        <span v-if="trashedCount > 0" class="ml-1.5 py-0.5 px-2 text-xs font-medium bg-gray-100 rounded-full">
+                            {{ trashedCount }}
+                        </span>
+                    </Link>
+
                     <!-- Import Schools Button -->
                     <Link
                         href="#"

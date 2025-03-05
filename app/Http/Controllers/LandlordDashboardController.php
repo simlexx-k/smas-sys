@@ -54,7 +54,15 @@ class LandlordDashboardController extends Controller
                 ->paginate(10)
                 ->withQueryString();
 
-            return Inertia::render('Dashboard', [
+            // Get deleted schools
+            $recentlyDeleted = Tenant::onlyTrashed()
+                ->latest('deleted_at')
+                ->take(5)
+                ->get(['id', 'name', 'deleted_at']);
+
+            $totalDeleted = Tenant::onlyTrashed()->count();
+
+            return Inertia::render('Landlord/Dashboard', [
                 'stats' => [
                     'total_tenants' => Tenant::count(),
                     'active_tenants' => Tenant::where('status', 'active')->count(),
@@ -64,11 +72,15 @@ class LandlordDashboardController extends Controller
                 'systemStatus' => app(SystemHealthService::class)->checkAll(),
                 'activities' => $activities,
                 'filters' => $request->only(['search', 'status']),
+                'recentlyDeleted' => $recentlyDeleted,
+                'totalDeleted' => $totalDeleted,
             ]);
         } catch (\Exception $e) {
-            report($e); // Log the error
-            return Inertia::render('Dashboard', [
+            report($e);
+            return Inertia::render('Landlord/Dashboard', [
                 'error' => 'Failed to load dashboard data',
+                'recentlyDeleted' => [],
+                'totalDeleted' => 0,
             ])->with('flash', [
                 'type' => 'error',
                 'message' => 'There was an error loading the dashboard.',

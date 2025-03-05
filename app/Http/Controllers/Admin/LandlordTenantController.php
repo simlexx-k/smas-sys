@@ -16,6 +16,12 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Str;
 use App\Mail\AdminPasswordReset;
+use App\Models\Activity;
+use App\Exports\DeletedTenantsExport;
+use Maatwebsite\Excel\Facades\Excel;
+use Illuminate\Support\Facades\Storage;
+use Carbon\Carbon;
+use App\Models\Plan;
 
 class LandlordTenantController extends Controller
 {
@@ -52,18 +58,45 @@ class LandlordTenantController extends Controller
             ])
             ->withQueryString();
 
+        $trashedCount = Tenant::onlyTrashed()->count();
+
         return Inertia::render('Admin/Tenants/Index', [
             'schools' => [
                 'data' => $tenants->items(),
                 'links' => $tenants->links()
             ],
-            'filters' => $request->only(['search', 'status'])
+            'filters' => $request->only(['search', 'status']),
+            'trashedCount' => $trashedCount
         ]);
     }
 
     public function create()
     {
-        return Inertia::render('Admin/Tenants/Create');
+        $data = [
+            'tenant' => null,
+            'schoolTypes' => [
+                'primary' => 'Primary School',
+                'secondary' => 'Secondary School',
+                'college' => 'College',
+                'university' => 'University',
+                'other' => 'Other'
+            ],
+            'subscriptionPlans' => Plan::where('is_active', true)
+                ->orderBy('sort_order')
+                ->get()
+                ->mapWithKeys(fn($plan) => [$plan->slug => $plan->name])
+                ->toArray(),
+            'statuses' => [
+                'active' => 'Active',
+                'inactive' => 'Inactive',
+                'suspended' => 'Suspended'
+            ],
+        ];
+
+        // Add debug logging
+        \Log::info('Create Tenant Form Data:', $data);
+
+        return Inertia::render('Admin/Tenants/Create', $data);
     }
 
     public function show(Tenant $tenant)
@@ -81,42 +114,93 @@ class LandlordTenantController extends Controller
 
     public function store(Request $request)
     {
-        $validated = $request->validate([
-            'domain' => ['required', 'string', 'max:255', Rule::unique('tenants')],
-            'name' => ['required', 'string', 'max:255'],
-            'admin_name' => ['required', 'string', 'max:255'],
-            'admin_email' => ['required', 'email', 'max:255'],
-            'admin_password' => ['required', 'string', 'min:8'],
-            'school_type' => ['required', 'string'],
-            'subscription_plan' => ['required', 'string'],
-            'status' => ['required', 'string'],
+        \Log::info('Tenant creation started', [
+            'request_data' => $request->all(),
+            'available_plans' => Plan::where('is_active', true)
+                ->pluck('slug')
+                ->toArray()
         ]);
 
-        DB::beginTransaction();
         try {
-            $tenant = Tenant::create([
-                'domain' => $validated['domain'],
-                'name' => $validated['name'],
-                'school_type' => $validated['school_type'],
-                'subscription_plan' => $validated['subscription_plan'],
-                'status' => $validated['status']
+            $validated = $request->validate([
+                'name' => 'required|string|max:255',
+                'domain' => 'required|string|max:255|unique:tenants',
+                'email' => 'required|email|max:255',
+                'phone' => 'nullable|string|max:20',
+                'address' => 'nullable|string|max:500',
+                'logo' => 'nullable|image|max:1024',
+                'status' => 'required|string|in:active,inactive,suspended',
+                'school_type' => 'required|string',
+                'subscription_plan' => ['required', 'string', Rule::exists('plans', 'slug')->where('is_active', true)],
+                'admin_name' => 'required|string|max:255',
+                'admin_email' => 'required|email|max:255',
+                'admin_password' => 'required|string|min:8',
+                'subscription_starts_at' => 'required|date',
+                'trial_ends_at' => 'required|date',
             ]);
 
-            User::create([
+            \Log::info('Validation passed', ['validated_data' => $validated]);
+
+            DB::beginTransaction();
+
+            // Create the tenant
+            $tenant = Tenant::create([
+                'name' => $validated['name'],
+                'domain' => $validated['domain'],
+                'email' => $validated['email'],
+                'phone' => $validated['phone'],
+                'address' => $validated['address'],
+                'status' => $validated['status'],
+                'school_type' => $validated['school_type'],
+                'subscription_plan' => $validated['subscription_plan'],
+            ]);
+
+            \Log::info('Tenant created', ['tenant_id' => $tenant->id]);
+
+            // Handle logo upload if present
+            if ($request->hasFile('logo')) {
+                $path = $request->file('logo')->store('tenant-logos', 'public');
+                $tenant->logo_url = Storage::url($path);
+                $tenant->save();
+                \Log::info('Logo uploaded', ['path' => $path]);
+            }
+
+            // Create admin user
+            $admin = User::create([
                 'name' => $validated['admin_name'],
                 'email' => $validated['admin_email'],
                 'password' => Hash::make($validated['admin_password']),
                 'tenant_id' => $tenant->id,
-                'role' => 'tenant-admin',
+                'role' => 'admin',
             ]);
 
+            \Log::info('Admin user created', ['admin_id' => $admin->id]);
+
+            // Create subscription
+            $subscription = $tenant->subscriptions()->create([
+                'status' => 'active',
+                'starts_at' => $validated['subscription_starts_at'],
+                'ends_at' => Carbon::parse($validated['subscription_starts_at'])->addMonth(),
+                'trial_ends_at' => $validated['trial_ends_at'],
+                'price' => $this->getSubscriptionPrice($validated['subscription_plan']),
+                'features' => json_encode($this->getSubscriptionFeatures($validated['subscription_plan'])),
+            ]);
+
+            \Log::info('Subscription created', ['subscription_id' => $subscription->id]);
+
             DB::commit();
+            \Log::info('Tenant creation completed successfully');
+
             return redirect()
                 ->route('admin.tenants.show', $tenant)
-                ->with('success', 'School created successfully');
+                ->with('success', 'School created successfully.');
         } catch (\Exception $e) {
             DB::rollBack();
-            return back()->withErrors(['error' => 'Failed to create school']);
+            \Log::error('Tenant creation failed', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+            return back()->withErrors(['error' => 'Failed to create school: ' . $e->getMessage()]);
         }
     }
 
@@ -139,22 +223,16 @@ class LandlordTenantController extends Controller
 
     public function destroy(Tenant $tenant)
     {
-        // Validate that the tenant can be deleted
-        if ($tenant->subscription && $tenant->subscription->status === 'active') {
-            return back()->with('error', 'Cannot delete a school with an active subscription.');
-        }
-
-        DB::beginTransaction();
-
         try {
-            // Delete related records
-            $tenant->domains()->delete();
-            $tenant->subscription()->delete();
-            
-            // Delete the admin user
-            if ($tenant->admin) {
-                $tenant->admin->delete();
-            }
+            DB::beginTransaction();
+
+            // Log the deletion activity before deleting the tenant
+            Activity::log(
+                'tenant',
+                'delete',
+                "Deleted school: {$tenant->name}",
+                $tenant
+            );
 
             // Delete the tenant
             $tenant->delete();
@@ -164,9 +242,14 @@ class LandlordTenantController extends Controller
             return redirect()
                 ->route('admin.tenants.index')
                 ->with('success', 'School has been successfully deleted.');
+
         } catch (\Exception $e) {
             DB::rollBack();
-            return back()->with('error', 'Failed to delete school. Please try again.');
+            report($e); // Log the error
+
+            return redirect()
+                ->back()
+                ->with('error', 'Failed to delete school. Please try again.');
         }
     }
 
@@ -215,10 +298,39 @@ class LandlordTenantController extends Controller
 
     public function edit(Tenant $tenant)
     {
-        $tenant->load(['subscription', 'admin']);
-
         return Inertia::render('Admin/Tenants/Edit', [
-            'tenant' => $tenant,
+            'tenant' => [
+                'id' => $tenant->id,
+                'name' => $tenant->name,
+                'domain' => $tenant->domain,
+                'email' => $tenant->email,
+                'phone' => $tenant->phone,
+                'address' => $tenant->address,
+                'logo_url' => $tenant->logo_url,
+                'status' => $tenant->status,
+                'school_type' => $tenant->school_type,
+                'subscription_plan' => $tenant->subscription_plan,
+                'subscription' => $tenant->subscription ? [
+                    'id' => $tenant->subscription->id,
+                    'status' => $tenant->subscription->status,
+                    'starts_at' => $tenant->subscription->starts_at,
+                    'ends_at' => $tenant->subscription->ends_at,
+                    'trial_ends_at' => $tenant->subscription->trial_ends_at,
+                    'price' => $tenant->subscription->price,
+                    'features' => $tenant->subscription->features,
+                    'payment_method' => $tenant->subscription->payment_method,
+                    'last_payment_at' => $tenant->subscription->last_payment_at,
+                    'next_payment_at' => $tenant->subscription->next_payment_at,
+                ] : null,
+                'admin' => $tenant->admin ? [
+                    'id' => $tenant->admin->id,
+                    'name' => $tenant->admin->name,
+                    'email' => $tenant->admin->email,
+                    'email_verified_at' => $tenant->admin->email_verified_at,
+                    'created_at' => $tenant->admin->created_at,
+                    'updated_at' => $tenant->admin->updated_at,
+                ] : null,
+            ],
             'schoolTypes' => [
                 'primary' => 'Primary School',
                 'secondary' => 'Secondary School',
@@ -235,7 +347,7 @@ class LandlordTenantController extends Controller
                 'active' => 'Active',
                 'inactive' => 'Inactive',
                 'suspended' => 'Suspended'
-            ]
+            ],
         ]);
     }
 
@@ -322,5 +434,118 @@ class LandlordTenantController extends Controller
             DB::rollBack();
             return back()->with('error', 'Failed to update subscription plan. Please try again.');
         }
+    }
+
+    public function trash()
+    {
+        $tenants = Tenant::onlyTrashed()
+            ->with(['subscription', 'admin'])
+            ->latest('deleted_at')
+            ->paginate();
+
+        $stats = [
+            'total' => Tenant::onlyTrashed()->count(),
+            'expiringSoon' => Tenant::onlyTrashed()
+                ->where('deleted_at', '<=', now()->addDays(7))
+                ->count(),
+            'storageUsed' => '-- MB', // Placeholder until we implement storage tracking
+            'byStatus' => [
+                'active' => 0,
+                'trial' => 0,
+                'canceled' => 0
+            ]
+        ];
+
+        // Get subscription status counts
+        $statusCounts = Tenant::onlyTrashed()
+            ->whereHas('subscription', function ($query) {
+                $query->whereNotNull('status');
+            })
+            ->join('subscriptions', 'tenants.id', '=', 'subscriptions.tenant_id')
+            ->selectRaw('subscriptions.status, count(*) as count')
+            ->groupBy('subscriptions.status')
+            ->pluck('count', 'status')
+            ->toArray();
+
+        $stats['byStatus'] = array_merge($stats['byStatus'], $statusCounts);
+
+        return Inertia::render('Admin/Tenants/Trash', [
+            'tenants' => $tenants,
+            'stats' => $stats
+        ]);
+    }
+
+    public function restore(Tenant $tenant)
+    {
+        if (!$tenant->canBeRestored()) {
+            return back()->with('error', 'This school cannot be restored anymore.');
+        }
+
+        try {
+            DB::beginTransaction();
+            
+            $tenant->restore();
+            
+            DB::commit();
+            
+            return redirect()
+                ->route('admin.tenants.show', $tenant)
+                ->with('success', 'School has been restored successfully.');
+        } catch (\Exception $e) {
+            DB::rollBack();
+            report($e);
+            
+            return back()->with('error', 'Failed to restore school.');
+        }
+    }
+
+    public function forceDelete(Tenant $tenant)
+    {
+        try {
+            DB::beginTransaction();
+            
+            // Permanently delete all related data
+            $tenant->forceDelete();
+            
+            DB::commit();
+            
+            return redirect()
+                ->route('admin.tenants.trash')
+                ->with('success', 'School has been permanently deleted.');
+        } catch (\Exception $e) {
+            DB::rollBack();
+            report($e);
+            
+            return back()->with('error', 'Failed to permanently delete school.');
+        }
+    }
+
+    public function exportTrash()
+    {
+        try {
+            return Excel::download(
+                new DeletedTenantsExport,
+                'deleted-schools-' . now()->format('Y-m-d') . '.xlsx'
+            );
+        } catch (\Exception $e) {
+            report($e);
+            return back()->with('error', 'Failed to export deleted schools.');
+        }
+    }
+
+    private function getSubscriptionPrice(string $planSlug): string
+    {
+        $plan = Plan::where('slug', $planSlug)
+            ->where('is_active', true)
+            ->firstOrFail();
+        return (string) $plan->price;
+    }
+
+    private function getSubscriptionFeatures(string $planSlug): array
+    {
+        $plan = Plan::where('slug', $planSlug)
+            ->where('is_active', true)
+            ->firstOrFail();
+        return $plan->features ?? [];
     }
 } 

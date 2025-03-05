@@ -33,10 +33,27 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
     // Existing Landlord (super admin) routes
     Route::middleware(['role:landlord'])->prefix('admin')->name('admin.')->group(function () {
+        Route::get('tenants/trash', [LandlordTenantController::class, 'trash'])
+            ->name('tenants.trash');
+
+        Route::post('tenants/{tenant}/restore', [LandlordTenantController::class, 'restore'])
+            ->name('tenants.restore')
+            ->withTrashed();
+
+        Route::delete('tenants/{tenant}/force', [LandlordTenantController::class, 'forceDelete'])
+            ->name('tenants.force-delete')
+            ->withTrashed();
+
+        Route::get('tenants/export-trash', [LandlordTenantController::class, 'exportTrash'])
+            ->name('tenants.export-trash');
+
         Route::get('/tenants', [LandlordTenantController::class, 'index'])->name('tenants.index');
-        Route::post('tenants/{tenant}/impersonate', [LandlordTenantController::class, 'impersonate'])->name('tenants.impersonate');
-        Route::post('tenants/{tenant}/reset-password', [LandlordTenantController::class, 'resetAdminPassword'])->name('tenants.reset-password');
-        Route::post('tenants/{tenant}/change-plan', [LandlordTenantController::class, 'changePlan'])->name('tenants.change-plan');
+        Route::post('/tenants/{id}/impersonate', [LandlordTenantController::class, 'impersonate'])
+            ->name('tenants.impersonate');
+        Route::post('/tenants/{id}/reset-password', [LandlordTenantController::class, 'resetPassword'])
+            ->name('tenants.reset-password');
+        Route::post('/tenants/{id}/change-plan', [LandlordTenantController::class, 'changePlan'])
+            ->name('tenants.change-plan');
         Route::resource('tenants', LandlordTenantController::class);
         Route::resource('subscriptions', SubscriptionController::class);
         
@@ -70,6 +87,9 @@ Route::middleware(['auth', 'verified'])->group(function () {
             Route::get('stats/classes', [LandlordTenantController::class, 'getClassStats'])->name('stats.classes');
             Route::get('stats/students', [LandlordTenantController::class, 'getStudentStats'])->name('stats.students');
         });
+
+        Route::delete('/tenants/{tenant}', [LandlordTenantController::class, 'destroy'])
+            ->name('tenants.destroy');
     });
 
     // Tenant admin routes
