@@ -6,16 +6,16 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use App\Traits\TenantBindable;
 
-class Exam extends Model
+class Term extends Model
 {
     use HasFactory, TenantBindable;
 
     protected $fillable = [
         'tenant_id',
-        'term_id',
         'name',
         'start_date',
         'end_date',
+        'academic_year',
         'status'
     ];
 
@@ -24,23 +24,13 @@ class Exam extends Model
         'end_date' => 'date',
     ];
 
-    public function term()
+    public function exams()
     {
-        return $this->belongsTo(Term::class);
+        return $this->hasMany(Exam::class);
     }
 
     public function tenant()
     {
         return $this->belongsTo(Tenant::class);
     }
-
-    public function reportCards()
-    {
-        return $this->hasMany(ReportCard::class);
-    }
-
-    // public function subject()
-    // {
-    //     return $this->belongsTo(Subject::class);
-    // }
-}
+} 

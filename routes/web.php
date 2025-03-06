@@ -13,6 +13,7 @@ use App\Http\Controllers\Teacher\DashboardController as TeacherDashboardControll
 use App\Http\Controllers\Teacher\ClassController as TeacherClassController;
 use App\Http\Controllers\Teacher\AttendanceController as TeacherAttendanceController;
 use App\Http\Controllers\TeacherController;
+use App\Http\Controllers\Teacher\ExamResultsController;
 
 // Public routes
 Route::get('/', function () {
@@ -151,11 +152,21 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::post('/classes/{class}/attendance', [TeacherAttendanceController::class, 'store'])
             ->name('attendance.store');
     });
+
+    Route::get('/teacher/students', [TeacherDashboardController::class, 'students'])
+        ->middleware(['auth', 'role:teacher'])
+        ->name('teacher.students');
 });
 
 // API routes
 Route::prefix('api')->group(function () {
     Route::apiResource('subjects', \App\Http\Controllers\Api\SubjectController::class);
+});
+
+Route::middleware(['auth', 'verified', 'role:teacher'])->group(function () {
+    Route::get('/teacher/exam-results', [ExamResultsController::class, 'index'])->name('teacher.exam-results');
+    Route::get('/teacher/exam-results/get', [ExamResultsController::class, 'getResults'])->name('teacher.exam-results.get');
+    Route::post('/teacher/exam-results', [ExamResultsController::class, 'store'])->name('teacher.exam-results.store');
 });
 
 require __DIR__.'/settings.php';

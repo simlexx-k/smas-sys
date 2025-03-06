@@ -6,7 +6,7 @@ import NavUser from '@/components/NavUser.vue';
 import { Sidebar, SidebarContent, SidebarFooter, SidebarHeader, SidebarMenu, SidebarMenuButton, SidebarMenuItem } from '@/components/ui/sidebar';
 import { type NavItem } from '@/types';
 import { Link, usePage } from '@inertiajs/vue3';
-import { BookOpen, LayoutGrid, PlusIcon, SchoolIcon, Building, CreditCard, Settings, Users, BookOpenCheck, GraduationCap } from 'lucide-vue-next';
+import { BookOpen, LayoutGrid, PlusIcon, SchoolIcon, Building, CreditCard, Settings, Users, BookOpenCheck, GraduationCap, ScrollText } from 'lucide-vue-next';
 import AppLogo from './AppLogo.vue';
 
 const isMounted = ref(false);
@@ -86,8 +86,13 @@ const mainNavItems: NavItem[] = [
     ] : page.props.auth.user?.role === 'teacher' ? [
         {
             title: 'Students',
-            href: '/students',
+            href: '/teacher/students',
             icon: SchoolIcon,
+        },
+        {
+            title: 'Academics',
+            href: '/teacher/exam-results',
+            icon: ScrollText,
         }
     ] : []),
 ];
