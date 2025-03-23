@@ -17,7 +17,7 @@ return new class extends Migration
                // ->onDelete('restrict');
 
             // Make plan column nullable since we're transitioning to plan_id
-            $table->string('plan')->nullable()->change();
+           // $table->string('plan')->nullable()->change();
         });
     }
 
@@ -29,7 +29,7 @@ return new class extends Migration
             // Remove the column
             $table->dropColumn('plan_id');
             // Make plan column required again
-            $table->string('plan')->nullable(false)->change();
+            //$table->string('plan')->nullable(false)->change();
         });
     }
 }; 
