@@ -9,7 +9,7 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('activities', function (Blueprint $table) {
-            $table->json('metadata')->nullable()->after('subject_id');
+            //$table->json('metadata')->nullable()->after('subject_id');
         });
     }
 
