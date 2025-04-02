@@ -45,6 +45,8 @@ class Tenant extends Model
     const STATUS_INACTIVE = 'inactive';
     const STATUS_SUSPENDED = 'suspended';
 
+    public static $currentModel;
+
     protected static function booted()
     {
         static::$hashids = new Hashids('a1b2c3d4e5f6g7h8i9j0k1l2m3n4o5p6q7r8s9t0u1v2w3x4y5z6', 8);
@@ -58,6 +60,11 @@ class Tenant extends Model
                     ->delay(now()->addMinutes(5));
             }
         });
+
+        // Temporarily disable automatic activity logging for tenant creation
+        // static::created(function ($tenant) {
+        //     static::logActivity('create', 'Tenant Created', "New tenant '{$tenant->name}' was created");
+        // });
     }
 
     public static function current()
@@ -276,5 +283,12 @@ class Tenant extends Model
             ->get()
             ->pluck('lessons')
             ->flatten();
+    }
+
+    // Add this method to set user context
+    public static function setUserContext($userId)
+    {
+        static::$currentModel = new static;
+        static::$currentModel->created_by_user_id = $userId;
     }
 }

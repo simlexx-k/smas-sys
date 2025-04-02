@@ -4,6 +4,8 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class ReportCard extends Model
 {
@@ -14,19 +16,22 @@ class ReportCard extends Model
         'exam_id',
         'subject_id',
         'score',
-        'grade',
-        'remarks',
         'tenant_id'
     ];
 
-    public function student()
+    public function student(): BelongsTo
     {
         return $this->belongsTo(Student::class);
     }
 
-    public function exam()
+    public function exam(): BelongsTo
     {
         return $this->belongsTo(Exam::class);
+    }
+
+    public function score(): HasMany
+    {
+        return $this->hasMany(Score::class);
     }
 
     public function subject()

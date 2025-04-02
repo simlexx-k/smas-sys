@@ -7,6 +7,7 @@ import jsPDF from 'jspdf';
 import 'jspdf-autotable';
 import axios from 'axios';
 import { usePage } from '@inertiajs/vue3';
+import { useToast } from 'vue-toastification';
 
 interface Student {
   id: number;
@@ -19,13 +20,20 @@ interface Student {
   address: string;
   phone_number: string;
   email: string;
+  class_name: string;
   created_at: string;
   updated_at: string;
+}
+
+interface Class {
+  id: number;
+  name: string;
 }
 
 const tenantId = usePage().props.tenant.id;
 
 const students = ref<Student[]>([]);
+const classes = ref<Class[]>([]);
 const showForm = ref(false);
 const showExportMenu = ref(false);
 const showModal = ref(false);
@@ -45,8 +53,6 @@ const form = ref({
   email: ''
 });
 
-const classes = ref([]);
-
 const breadcrumbs = [
   {
     title: 'Students',
@@ -63,13 +69,16 @@ const statusFilter = ref('All');
 const itemsPerPage = ref(10);
 const currentPage = ref(1);
 
+// Add toast
+const toast = useToast();
+
 // Computed properties for filtered and paginated data
 const filteredStudents = computed(() => {
   return students.value.filter(student => {
     const matchesSearch = student.first_name.toLowerCase().includes(searchQuery.value.toLowerCase()) ||
                          student.last_name.toLowerCase().includes(searchQuery.value.toLowerCase()) ||
                          student.email.toLowerCase().includes(searchQuery.value.toLowerCase());
-    const matchesClass = selectedClass.value === 'All' || student.school_class_id === selectedClass.value;
+    const matchesClass = selectedClass.value === 'All' || student.school_class_id === parseInt(selectedClass.value);
     const matchesStatus = statusFilter.value === 'All' || student.gender === statusFilter.value;
     return matchesSearch && matchesClass && matchesStatus;
   });
@@ -139,50 +148,78 @@ const exportToPDF = () => {
 
 // Class options for filter
 const classOptions = computed(() => {
-  const classes = new Set(students.value.map(student => student.school_class_id));
-  return ['All', ...Array.from(classes)];
+  return ['All', ...classes.value.map(c => c.id)];
 });
 
 // Status options for filter
 const statusOptions = ['All', 'male', 'female', 'other'];
 
-const fetchClasses = async () => {
-  try {
-    const response = await axios.get(`/api/classes?tenant_id=${tenantId.value}`);
-    classes.value = response.data.data;
-  } catch (err) {
-    error.value = 'Failed to fetch classes';
-  }
-};
-
-// New CRUD operations
 const fetchStudents = async () => {
   try {
     loading.value = true;
-    error.value = null;
     const response = await axios.get('/api/students');
-    students.value = response.data;
+    students.value = response.data.students;
+    classes.value = response.data.classes;
+    loading.value = false;
   } catch (err) {
-    error.value = 'Failed to fetch students';
+    error.value = 'Failed to load students';
+    loading.value = false;
+  }
+};
+
+const saveStudent = async () => {
+  try {
+    loading.value = true;
+    if (isEditing.value) {
+      await updateStudent();
+    } else {
+      await createStudent();
+    }
+    showModal.value = false; // Close the modal after successful save
+  } catch (err) {
+    console.error('Error saving student:', err);
   } finally {
     loading.value = false;
   }
 };
 
 const openCreateModal = () => {
-  form.value = { id: null, tenant_id: usePage().props.tenant.id, school_class_id: null, first_name: '', last_name: '', date_of_birth: '', gender: 'male', address: '', phone_number: '', email: '' };
   isEditing.value = false;
+  form.value = {
+    id: null,
+    tenant_id: usePage().props.tenant.id,
+    school_class_id: null,
+    first_name: '',
+    last_name: '',
+    date_of_birth: '',
+    gender: 'male',
+    address: '',
+    phone_number: '',
+    email: ''
+  };
   showModal.value = true;
 };
 
 const openEditModal = (student: Student) => {
-  form.value = { ...student };
   isEditing.value = true;
+  form.value = { ...student };
   showModal.value = true;
 };
 
 const closeModal = () => {
   showModal.value = false;
+  form.value = {
+    id: null,
+    tenant_id: usePage().props.tenant.id,
+    school_class_id: null,
+    first_name: '',
+    last_name: '',
+    date_of_birth: '',
+    gender: 'male',
+    address: '',
+    phone_number: '',
+    email: ''
+  };
 };
 
 const showToast = ref(false);
@@ -216,26 +253,41 @@ const validateForm = () => {
   return errors;
 };
 
-const saveStudent = async () => {
-  const errors = validateForm();
-  if (errors.length > 0) {
-    showErrorToast(errors.join('\n'));
-    return;
-  }
-
+const createStudent = async () => {
   try {
     loading.value = true;
-    if (isEditing.value) {
-      await axios.put(`/api/students/${form.value.id}`, form.value);
-      showSuccessToast('Student updated successfully');
-    } else {
-      await axios.post('/api/students', form.value);
-      showSuccessToast('Student created successfully');
-    }
+    const response = await axios.post('/api/students', form.value);
     await fetchStudents();
-    closeModal();
-  } catch (err) {
-    showErrorToast('Failed to save student: ' + err.message);
+    showForm.value = false;
+    form.value = {
+      id: null,
+      tenant_id: usePage().props.tenant.id,
+      school_class_id: null,
+      first_name: '',
+      last_name: '',
+      date_of_birth: '',
+      gender: 'male',
+      address: '',
+      phone_number: '',
+      email: ''
+    };
+    toast.success('Student created successfully!');
+  } catch (err: any) {
+    toast.error(err.response?.data?.error || 'Failed to create student');
+  } finally {
+    loading.value = false;
+  }
+};
+
+const updateStudent = async () => {
+  try {
+    loading.value = true;
+    await axios.put(`/api/students/${form.value.id}`, form.value);
+    await fetchStudents();
+    showForm.value = false;
+    toast.success('Student updated successfully!');
+  } catch (err: any) {
+    toast.error(err.response?.data?.error || 'Failed to update student');
   } finally {
     loading.value = false;
   }
@@ -250,24 +302,20 @@ const confirmDelete = (student) => {
 };
 
 const proceedWithDelete = async () => {
-  if (studentToDelete.value) {
-    await deleteStudent(studentToDelete.value.id);
-    showDeleteConfirmation.value = false;
-    studentToDelete.value = null;
-  }
-};
-
-const deleteStudent = async (id: number) => {
   try {
-    await axios.delete(`/api/students/${id}`);
+    loading.value = true;
+    await axios.delete(`/api/students/${studentToDelete.value?.id}`);
     await fetchStudents();
-  } catch (err) {
-    error.value = 'Failed to delete student';
+    showDeleteConfirmation.value = false;
+    toast.success('Student deleted successfully!');
+  } catch (err: any) {
+    toast.error(err.response?.data?.error || 'Failed to delete student');
+  } finally {
+    loading.value = false;
   }
 };
 
 onMounted(() => {
-  fetchClasses();
   fetchStudents();
 });
 </script>
@@ -343,8 +391,13 @@ onMounted(() => {
           v-model="selectedClass" 
           class="px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-sm text-gray-700 bg-white"
         >
-          <option v-for="option in classOptions" :key="option" :value="option">
-            {{ option || 'Select Class' }}
+          <option value="All">All Classes</option>
+          <option 
+            v-for="classOption in classes" 
+            :key="classOption.id" 
+            :value="classOption.id"
+          >
+            {{ classOption.name }}
           </option>
         </select>
         <select 
@@ -393,7 +446,7 @@ onMounted(() => {
                   <div class="text-gray-500">{{ student.address }}</div>
                 </td>
                 <td class="px-6 py-4 text-sm text-gray-900">
-                  {{ student.school_class_id || '–' }}
+                  {{ classes.find(c => c.id === student.school_class_id)?.name || '–' }}
                 </td>
                 <td class="px-6 py-4 text-right text-sm font-medium">
                   <div class="flex items-center justify-end space-x-3">
@@ -447,16 +500,16 @@ onMounted(() => {
               <div class="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
                 <div class="flex items-center justify-between mb-6">
                   <h3 class="text-lg leading-6 font-medium text-gray-900">
-                    {{ isEditing ? 'Edit Learner Details' : 'Register New Learner' }}
+                    {{ isEditing ? 'Edit Student Details' : 'Register New Student' }}
                   </h3>
                   <button @click="closeModal" class="text-gray-400 hover:text-gray-500">
                     <X class="h-6 w-6" />
                   </button>
                 </div>
-                <!-- Enhanced Form -->
+                <!-- Form -->
                 <form @submit.prevent="saveStudent" class="space-y-6">
-                  <!-- Form content similar to original but with better spacing and labels -->
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <!-- Form content -->
+                  <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
                       <label class="block text-sm font-medium text-gray-700 mb-1">First Name</label>
                       <input v-model="form.first_name" type="text" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500" required>
@@ -484,8 +537,19 @@ onMounted(() => {
 
                   <div>
                     <label class="block text-sm font-medium text-gray-700 mb-1">Class</label>
-                    <select v-model="form.school_class_id" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500" required>
-                      <option v-for="classOption in classes" :key="classOption.id" :value="classOption.id">{{ classOption.name }}</option>
+                    <select 
+                      v-model="form.school_class_id" 
+                      class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500" 
+                      required
+                    >
+                      <option value="">Select a class</option>
+                      <option 
+                        v-for="classOption in classes" 
+                        :key="classOption.id" 
+                        :value="classOption.id"
+                      >
+                        {{ classOption.name }}
+                      </option>
                     </select>
                   </div>
 
@@ -506,8 +570,20 @@ onMounted(() => {
                   </div>
 
                   <div class="mt-6 flex justify-end space-x-3">
-                    <button type="button" @click="closeModal" class="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200">Cancel</button>
-                    <button type="submit" class="px-4 py-2 text-sm font-medium text-white bg-blue-500 rounded-lg hover:bg-blue-600">Save Student</button>
+                    <button 
+                      type="button" 
+                      @click="closeModal" 
+                      class="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200"
+                    >
+                      Cancel
+                    </button>
+                    <button 
+                      type="submit"
+                      :disabled="loading"
+                      class="px-4 py-2 text-sm font-medium text-white bg-blue-500 rounded-lg hover:bg-blue-600 disabled:opacity-50"
+                    >
+                      {{ loading ? 'Saving...' : (isEditing ? 'Update Student' : 'Save Student') }}
+                    </button>
                   </div>
                 </form>
               </div>

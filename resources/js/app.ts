@@ -4,7 +4,7 @@ import '../css/app.css';
 import { createApp, h, DefineComponent } from 'vue';
 import { createInertiaApp } from '@inertiajs/vue3';
 import { resolvePageComponent } from 'laravel-vite-plugin/inertia-helpers';
-import { createApp, h, type DefineComponent } from 'vue';
+
 // import { ZiggyVue } from 'ziggy-js/dist/vue.m';
 import { ZiggyVue } from 'ziggy-js';
 import Toast from 'vue-toastification';

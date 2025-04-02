@@ -128,9 +128,30 @@ class ReportCardController extends Controller
             'student_id' => 'required_if:type,individual|exists:students,id'
         ]);
 
+        // Add tenant_id condition to all queries
         $classId = $request->query('class_id');
         $examId = $request->query('exam_id');
         $type = $request->query('type');
+        $tenantId = $request->query('tenant_id');
+
+        // Log the class details we're trying to fetch
+        $class = SchoolClass::where('id', $classId)
+            ->where('tenant_id', $tenantId)
+            ->first();
+        
+        Log::info('Class details:', [
+            'class_id' => $classId,
+            'tenant_id' => $tenantId,
+            'class' => $class ? $class->toArray() : 'Not found'
+        ]);
+
+        if (!$class) {
+            Log::error('Class not found', [
+                'class_id' => $classId,
+                'tenant_id' => $tenantId
+            ]);
+            return response()->json(['error' => 'Class not found'], 404);
+        }
 
         if ($type === 'individual') {
             $studentId = $request->query('student_id');
@@ -139,7 +160,7 @@ class ReportCardController extends Controller
             // Get report card for specific student
             $reportCard = ReportCard::where('student_id', $studentId)
                 ->where('exam_id', $examId)
-                ->with(['student.class', 'exam'])
+                ->with(['student.schoolClass', 'exam'])
                 ->first();
 
             if (!$reportCard) {
@@ -184,13 +205,13 @@ class ReportCardController extends Controller
             ->where('exam_id', $examId)
             ->select('student_id') // First get unique student IDs
             ->groupBy('student_id')
-            ->with(['student.class', 'exam'])
+            ->with(['student.schoolClass', 'exam'])
             ->get()
             ->map(function($reportCard) use ($examId) {
                 // Then get one report card for each student
                 return ReportCard::where('student_id', $reportCard->student_id)
                     ->where('exam_id', $examId)
-                    ->with(['student.class', 'exam'])
+                    ->with(['student.schoolClass', 'exam'])
                     ->first();
             });
 
@@ -256,7 +277,7 @@ class ReportCardController extends Controller
         // Get all subject scores for this student and exam
         $allSubjectScores = ReportCard::where('student_id', $reportCard->student_id)
             ->where('exam_id', $reportCard->exam_id)
-            ->with(['subject', 'student.class', 'exam', 'tenant'])
+            ->with(['subject', 'student.schoolClass', 'exam', 'tenant'])
             ->get();
 
         Log::info('All subject scores:', [
@@ -292,7 +313,7 @@ class ReportCardController extends Controller
         $student_details = [
             'name' => $reportCard->student->full_name ?? $reportCard->student->first_name . ' ' . $reportCard->student->last_name,
             'admission_number' => $reportCard->student->admission_number ?? 'N/A',
-            'class' => $reportCard->student->class->name ?? 'N/A',
+            'class' => $reportCard->student->schoolClass->name ?? 'N/A',
             'school_name' => $reportCard->tenant->name ?? 'N/A',
             'school_address' => $reportCard->tenant->address ?? '',
             'school_phone' => $reportCard->tenant->phone ?? '',
@@ -303,8 +324,8 @@ class ReportCardController extends Controller
         // Get exam details
         $exam_details = [
             'name' => $reportCard->exam->name ?? 'N/A',
-            'term' => $reportCard->exam->term ?? 'N/A',
-            'year' => $reportCard->exam->year ?? date('Y')
+            'term' => $reportCard->exam->term_name,
+            'year' => $reportCard->exam->academic_year
         ];
 
         // Calculate rank
@@ -349,13 +370,13 @@ class ReportCardController extends Controller
             // Get the first report card to access common data
             $firstCard = $reportCards->first();
             
-            // Get all subjects for this exam by joining through report_cards
+            // Get all subjects for this exam
             $subjects = Subject::join('report_cards', 'subjects.id', '=', 'report_cards.subject_id')
                 ->where('report_cards.exam_id', $firstCard->exam_id)
                 ->where('report_cards.tenant_id', $firstCard->tenant_id)
-                ->select('subjects.id', 'subjects.code', 'subjects.name')
+                ->select('subjects.id', 'subjects.name')
                 ->distinct()
-                ->orderBy('subjects.code')
+                ->orderBy('subjects.name')
                 ->get();
 
             // Get all students in the class
@@ -363,108 +384,100 @@ class ReportCardController extends Controller
                 ->orderBy('first_name')
                 ->get();
 
-            // Fetch all report cards for this exam and class in one query
-            $allReportCards = ReportCard::where('exam_id', $firstCard->exam_id)
-                ->whereIn('student_id', $students->pluck('id'))
-                ->with(['student', 'subject'])
-                ->get()
-                ->groupBy('student_id');
-
-            // Initialize arrays to store calculations
+            // Get all scores for these students
             $scores = [];
-            $totals = [];
-            $averages = [];
-            $grades = [];
+            foreach ($reportCards as $rc) {
+                $scores[$rc->student_id][$rc->subject_id] = $rc->score;
+            }
 
-            // Process scores for each student
+            // Calculate averages and prepare for sorting
+            $studentAverages = [];
+            foreach ($students as $student) {
+                $studentScores = $scores[$student->id] ?? [];
+                $validScores = array_filter($studentScores, 'is_numeric');
+                $average = !empty($validScores) ? array_sum($validScores) / count($validScores) : 0;
+                $studentAverages[$student->id] = round($average, 1); // Round to 1 decimal place
+            }
+
+            // Sort students by average score (descending)
+            arsort($studentAverages);
+
+            // Calculate positions (handling ties)
+            $position = 0;
+            $lastScore = null;
+            $positions = [];
+            foreach ($studentAverages as $studentId => $average) {
+                if ($average !== $lastScore) {
+                    $position = count($positions) + 1;
+                }
+                $positions[$studentId] = $position;
+                $lastScore = $average;
+            }
+
+            // Prepare results array
+            $results = [];
             foreach ($students as $student) {
                 $studentScores = [];
-                $total = 0;
-                $subjectCount = 0;
-
-                // Get this student's report cards
-                $studentReportCards = $allReportCards->get($student->id, collect([]));
-
                 foreach ($subjects as $subject) {
-                    // Find the report card for this subject
-                    $reportCard = $studentReportCards->first(function ($card) use ($subject) {
-                        return $card->subject_id === $subject->id;
-                    });
-
-                    if ($reportCard) {
-                        $studentScores[$subject->id] = number_format($reportCard->score, 0);
-                        $total += $reportCard->score;
-                        $subjectCount++;
-                    } else {
-                        $studentScores[$subject->id] = '-';
-                    }
+                    $score = $scores[$student->id][$subject->id] ?? null;
+                    $scoreValue = is_numeric($score) ? floatval($score) : null;
+                    $studentScores[] = [
+                        'subject' => $subject->name,
+                        'score' => $scoreValue,
+                        'grade' => $scoreValue ? $this->calculateGrade($scoreValue) : null
+                    ];
                 }
 
-                $scores[$student->id] = $studentScores;
-                $totals[$student->id] = $total;
-                
-                // Calculate average and format to one decimal place
-                $average = $subjectCount > 0 ? $total / $subjectCount : 0;
-                $averages[$student->id] = number_format($average, 1);
-                
-                $grades[$student->id] = $this->calculateGrade($average);
+                $validScores = collect($studentScores)->filter(fn($score) => !is_null($score['score']));
+                $total = $validScores->sum('score');
+                $average = $validScores->count() > 0 ? round($total / $validScores->count(), 1) : 0;
+                $position = $positions[$student->id] ?? 0;
+
+                $results[] = [
+                    'student_name' => $student->full_name,
+                    'rank' => $this->getOrdinalSuffix($position),
+                    'scores' => $studentScores,
+                    'total_score' => round($total, 1),
+                    'average' => $average,
+                    'overall_grade' => $this->calculateGrade($average)
+                ];
             }
 
-            // Calculate positions based on averages
-            $positions = [];
-            $sortedAverages = collect($averages)->map(function($avg) {
-                return floatval($avg);
-            })->sort()->reverse();
-            
-            $rank = 1;
-            $prevAverage = null;
-            $skipCount = 0;
-
-            foreach ($sortedAverages as $studentId => $average) {
-                if ($prevAverage !== null && $average < $prevAverage) {
-                    $rank += $skipCount + 1;
-                    $skipCount = 0;
-                } elseif ($prevAverage !== null && $average === $prevAverage) {
-                    $skipCount++;
+            // Sort results by rank and then by average (descending) for ties
+            usort($results, function($a, $b) {
+                if ($a['rank'] === $b['rank']) {
+                    return $b['average'] <=> $a['average'];
                 }
-                
-                $positions[$studentId] = $rank;
-                $prevAverage = $average;
-            }
-
-            // Sort students by their positions
-            $sortedStudents = $students->sort(function ($a, $b) use ($positions) {
-                $posA = $positions[$a->id] ?? PHP_INT_MAX;
-                $posB = $positions[$b->id] ?? PHP_INT_MAX;
-                return $posA - $posB;
+                return $a['rank'] <=> $b['rank'];
             });
 
-            // Get class details
-            $class = SchoolClass::find($firstCard->student->school_class_id);
-
-            $data = [
-                'reportCards' => $reportCards,
-                'exam' => $firstCard->exam,
-                'tenant' => $firstCard->tenant,
-                'class' => $class,
-                'subjects' => $subjects,
-                'sortedStudents' => $sortedStudents,
-                'scores' => $scores,
-                'totals' => $totals,
-                'averages' => $averages,
-                'grades' => $grades,
-                'positions' => $positions
+            // Calculate statistics
+            $statistics = [
+                'class_average' => collect($results)->avg('average'),
+                'highest_score' => collect($results)->max('average'),
+                'lowest_score' => collect($results)->min('average'),
+                'total_students' => count($results)
             ];
 
-            return Pdf::loadView('pdf.nominal_list', $data)->output();
+            // Prepare data for the template
+            $data = [
+                'tenant' => $firstCard->tenant,
+                'class' => ['name' => $firstCard->student->schoolClass->name],
+                'exam' => [
+                    'name' => $firstCard->exam->name,
+                    'term' => $firstCard->exam->term_name ?? 'N/A'
+                ],
+                'results' => $results,
+                'statistics' => $statistics,
+                'generated_at' => now()->format('Y-m-d H:i')
+            ];
+
+            return PDF::loadView('pdfs.academic-report', $data)->output();
+
         } catch (\Exception $e) {
             Log::error('PDF generation error', [
                 'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString(),
-                'data' => [
-                    'exam_id' => $firstCard->exam_id ?? null,
-                    'class_id' => $firstCard->student->school_class_id ?? null
-                ]
+                'trace' => $e->getTraceAsString()
             ]);
             throw new \RuntimeException('Failed to generate PDF: ' . $e->getMessage());
         }
@@ -472,46 +485,56 @@ class ReportCardController extends Controller
 
     public function bulkStore(Request $request)
     {
-        $reportCards = $request->validate([
-            '*.student_id' => 'required|exists:students,id',
-            '*.exam_id' => 'required|exists:exams,id',
-            '*.subject_id' => 'required|exists:subjects,id',
-            '*.score' => 'required|numeric|between:0,100',
-            '*.grade' => 'required|string|max:2',
-            '*.remarks' => 'nullable|string|max:255',
-            '*.tenant_id' => 'required|exists:tenants,id',
-        ]);
-
-        DB::beginTransaction();
         try {
-            foreach ($reportCards as $cardData) {
-                // Check if a report card already exists for this combination
-                $existingCard = ReportCard::where([
-                    'student_id' => $cardData['student_id'],
-                    'exam_id' => $cardData['exam_id'],
-                    'subject_id' => $cardData['subject_id'],
-                ])->first();
+            $validatedData = $request->validate([
+                '*.student_id' => 'required|exists:students,id',
+                '*.exam_id' => 'required|exists:exams,id',
+                '*.subject_id' => 'required|exists:subjects,id',
+                '*.tenant_id' => 'required|exists:tenants,id',
+                '*.score' => 'required|numeric|min:0|max:100',
+            ]);
 
-                if ($existingCard) {
-                    // Update existing record
-                    $existingCard->update($cardData);
-                } else {
-                    // Create new record
-                    ReportCard::create($cardData);
-                }
+            DB::beginTransaction();
+
+            foreach ($validatedData as $data) {
+                ReportCard::updateOrCreate(
+                    [
+                        'student_id' => $data['student_id'],
+                        'exam_id' => $data['exam_id'],
+                        'subject_id' => $data['subject_id'],
+                        'tenant_id' => $data['tenant_id'],
+                    ],
+                    [
+                        'score' => $data['score'],
+                    ]
+                );
             }
+
             DB::commit();
-            return response()->json(['message' => 'Report cards saved successfully'], 200);
+
+            return response()->json(['message' => 'Report cards saved successfully']);
         } catch (\Exception $e) {
             DB::rollBack();
-            Log::error('Error saving bulk report cards: ' . $e->getMessage());
-            return response()->json(['error' => 'Failed to save report cards'], 500);
+            Log::error('Failed to save report cards:', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+            
+            return response()->json([
+                'message' => 'Failed to save report cards',
+                'error' => $e->getMessage()
+            ], 500);
         }
     }
 
     private function generateBatchReportCards($classId, $examId)
     {
         try {
+            Log::info('Starting batch report cards generation', [
+                'class_id' => $classId,
+                'exam_id' => $examId
+            ]);
+
             // Create temp directory if it doesn't exist
             $tempDir = storage_path('app/temp');
             if (!file_exists($tempDir)) {
@@ -524,104 +547,173 @@ class ReportCardController extends Controller
                 ->get();
 
             if ($students->isEmpty()) {
+                Log::warning('No students found in class', ['class_id' => $classId]);
                 throw new \InvalidArgumentException('No students found in this class');
             }
 
             // Get all report cards for this exam and class
             $allReportCards = ReportCard::where('exam_id', $examId)
                 ->whereIn('student_id', $students->pluck('id'))
-                ->with(['student', 'subject', 'exam', 'tenant'])
+                ->with(['student', 'subject', 'exam.term', 'tenant']) // Make sure to eager load term
                 ->get()
                 ->groupBy('student_id');
 
-            // Prepare all report card PDFs
-            $pdfs = [];
-            $tempFiles = [];
+            Log::info('Found report cards', [
+                'total_students' => $students->count(),
+                'students_with_reports' => $allReportCards->count()
+            ]);
 
+            // Calculate averages and ranks
+            $studentAverages = [];
             foreach ($students as $student) {
                 $studentReportCards = $allReportCards->get($student->id);
                 if ($studentReportCards && $studentReportCards->count() > 0) {
-                    try {
-                        // Generate PDF content for this student
-                        $pdf = $this->generateStudentReportCard($studentReportCards->first(), $studentReportCards);
+                    $validScores = $studentReportCards->filter(function($rc) {
+                        return !is_null($rc->score);
+                    });
+                    
+                    $total = $validScores->sum('score');
+                    $count = $validScores->count();
+                    $average = $count > 0 ? round($total / $count, 2) : 0;
+                    
+                    $studentAverages[$student->id] = [
+                        'average' => $average,
+                        'student' => $student
+                    ];
+                }
+            }
+
+            // Sort by average in descending order
+            uasort($studentAverages, function($a, $b) {
+                return $b['average'] <=> $a['average'];
+            });
+
+            // Assign ranks
+            $rank = 1;
+            $totalStudents = count($studentAverages);
+            foreach ($studentAverages as &$data) {
+                $data['rank'] = $rank;
+                $data['total_students'] = $totalStudents;
+                $rank++;
+            }
+
+            $tempFiles = [];
+            // Get the class and exam details
+            $class = SchoolClass::findOrFail($classId);
+            $exam = Exam::with('term')->findOrFail($examId);
+
+            // Calculate class statistics
+            $classStats = [
+                'total_score' => 0,
+                'student_count' => 0,
+                'highest_score' => null, // Initialize as null
+                'lowest_score' => 100 // Start with maximum possible score
+            ];
+
+            // First pass to gather statistics
+            foreach ($students as $student) {
+                $studentReportCards = $allReportCards->get($student->id);
+                if ($studentReportCards && $studentReportCards->count() > 0) {
+                    $reportCard = $studentReportCards->first();
+                    if (isset($reportCard->average)) {
+                        $score = $reportCard->average;
+                        $classStats['total_score'] += $score;
+                        $classStats['student_count']++;
+                        // Update highest and lowest scores
+                        if ($classStats['highest_score'] === null || $score > $classStats['highest_score']) {
+                            $classStats['highest_score'] = $score;
+                        }
+                        if ($score < $classStats['lowest_score']) {
+                            $classStats['lowest_score'] = $score;
+                        }
+                    }
+                }
+            }
+
+            // Calculate class average
+            $classStats['class_average'] = $classStats['student_count'] > 0 
+                ? round($classStats['total_score'] / $classStats['student_count'], 2) 
+                : 0;
+
+            // Reset lowest score if no students found
+            if ($classStats['student_count'] === 0) {
+                $classStats['lowest_score'] = 0;
+            }
+
+            foreach ($students as $student) {
+                try {
+                    $studentReportCards = $allReportCards->get($student->id);
+                    if ($studentReportCards && $studentReportCards->count() > 0) {
+                        $tenant = auth()->user()->tenant ?? $studentReportCards->first()->tenant;
                         
-                        // Save to temporary file
-                        $tempFile = $tempDir . '/report_card_' . $student->id . '_' . uniqid() . '.pdf';
-                        file_put_contents($tempFile, $pdf);
-                        $tempFiles[] = $tempFile;
-                        $pdfs[] = $tempFile;
+                        // Generate rank data
+                        $rankData = isset($studentAverages[$student->id]) ? [
+                            'rank' => $studentAverages[$student->id]['rank'],
+                            'total_students' => count($studentAverages),
+                            'class_average' => $classStats['class_average'],
+                            'highest_score' => $classStats['highest_score'] // Ensure this is set
+                        ] : null;
+
+                        // Create PDF instance first
+                        $pdf = PDF::setPaper('A4', 'landscape');
                         
-                    } catch (\Exception $e) {
-                        Log::error('Failed to generate PDF for student', [
-                            'student_id' => $student->id,
-                            'error' => $e->getMessage()
+                        // Then load the view with data
+                        $pdf->loadView('pdfs.academic-report', [
+                            'report_card' => $studentReportCards->first(),
+                            'result' => $rankData,
+                            'statistics' => [
+                                'total_students' => count($studentAverages),
+                                'class_average' => $classStats['class_average'],
+                                'highest_score' => $classStats['highest_score'], // Ensure this is set
+                                'lowest_score' => $classStats['lowest_score']
+                            ],
+                            'generated_at' => now()->format('Y-m-d H:i:s'),
+                            'tenant' => $tenant,
+                            'class' => $class,
+                            'exam' => $exam
                         ]);
-                        // Continue with other students
-                        continue;
+
+                        // Save to temporary file with unique name
+                        $tempFile = storage_path('app/temp/' . uniqid('report_') . '.pdf');
+                        $pdf->save($tempFile);
+                        $tempFiles[] = $tempFile;
                     }
+                } catch (\Exception $e) {
+                    \Log::error("Failed to generate PDF for student {$student->id}: " . $e->getMessage());
+                    // Clean up temp files
+                    foreach ($tempFiles as $file) {
+                        if (file_exists($file)) {
+                            unlink($file);
+                        }
+                    }
+                    throw $e;
                 }
             }
 
-            if (empty($pdfs)) {
-                throw new \InvalidArgumentException('No report cards were generated');
-            }
-
-            // Merge all PDFs into one
-            try {
-                $merger = new \Jurosh\PDFMerge\PDFMerger;
+            // Merge PDFs if we have any
+            if (count($tempFiles) > 0) {
+                $merger = new \Jurosh\PDFMerge\PDFMerger();
+                foreach ($tempFiles as $file) {
+                    $merger->addPDF($file, 'all');
+                }
                 
-                foreach ($pdfs as $pdf) {
-                    $merger->addPDF($pdf, 'all');
-                }
+                $outputPath = storage_path('app/temp/merged_' . uniqid() . '.pdf');
+                $merger->merge('file', $outputPath);
 
-                // Generate the merged PDF
-                $mergedPdfPath = $tempDir . '/merged_report_cards_' . uniqid() . '.pdf';
-                $merger->merge('file', $mergedPdfPath);
-
-                // Clean up individual PDF files
+                // Clean up individual PDFs
                 foreach ($tempFiles as $file) {
                     if (file_exists($file)) {
                         unlink($file);
                     }
                 }
 
-                // Stream the merged PDF and clean up
-                return response()->streamDownload(
-                    function() use ($mergedPdfPath) {
-                        echo file_get_contents($mergedPdfPath);
-                        unlink($mergedPdfPath);
-                    },
-                    'report_cards.pdf',
-                    ['Content-Type' => 'application/pdf']
-                );
-
-            } catch (\Exception $e) {
-                // Clean up on error
-                foreach ($tempFiles as $file) {
-                    if (file_exists($file)) {
-                        unlink($file);
-                    }
-                }
-                if (isset($mergedPdfPath) && file_exists($mergedPdfPath)) {
-                    unlink($mergedPdfPath);
-                }
-                
-                Log::error('PDF merge failed', [
-                    'error' => $e->getMessage(),
-                    'trace' => $e->getTraceAsString()
-                ]);
-                
-                throw new \RuntimeException('Failed to merge PDFs: ' . $e->getMessage());
+                return $outputPath;
             }
 
+            throw new \Exception('No PDFs were generated to merge');
         } catch (\Exception $e) {
-            Log::error('Batch report card generation failed', [
-                'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString(),
-                'class_id' => $classId,
-                'exam_id' => $examId
-            ]);
-            throw new \RuntimeException('Failed to generate batch report cards: ' . $e->getMessage());
+            \Log::error("Failed to generate batch report cards: " . $e->getMessage());
+            throw new \Exception("Failed to generate batch report cards: " . $e->getMessage());
         }
     }
 
@@ -672,11 +764,11 @@ class ReportCardController extends Controller
                 'school_logo' => $reportCard->tenant->logo_url ?? null
             ];
 
-            // Get exam details
+            // Get exam details using the accessors
             $exam_details = [
                 'name' => $reportCard->exam->name ?? 'N/A',
-                'term' => $reportCard->exam->term ?? 'N/A',
-                'year' => $reportCard->exam->year ?? date('Y')
+                'term' => $reportCard->exam->term_name,
+                'academic_year' => $reportCard->exam->academic_year
             ];
 
             // Process subjects and scores
@@ -704,15 +796,29 @@ class ReportCardController extends Controller
             $average_score = $total_subjects > 0 ? round($total_score / $total_subjects, 2) : 0;
             $overall_grade = $this->calculateGrade($average_score);
 
+            // Calculate rank
+            $class_rankings = ReportCard::where('exam_id', $reportCard->exam_id)
+                ->whereHas('student', function($query) use ($class) {
+                    $query->where('school_class_id', $class->id);
+                })
+                ->select('student_id', DB::raw('AVG(score) as average'))
+                ->groupBy('student_id')
+                ->orderByDesc('average')
+                ->get();
+
+            // Calculate the student's rank
+            $student_rank = $class_rankings->search(function($item) use ($reportCard) {
+                return $item->student_id === $reportCard->student_id;
+            }) + 1; // +1 to convert from zero-based index to rank
+
+            // Prepare summary with overall grade
             $summary = [
                 'total_score' => $total_score,
                 'total_subjects' => $total_subjects,
                 'average_score' => $average_score,
                 'overall_grade' => $overall_grade,
-                'percentage' => number_format($average_score, 1),
-                'rank' => $rank,
-                'total_students' => $totalStudents,
-                'rank_suffix' => $this->getOrdinalSuffix($rank)
+                'rank' => $student_rank . ' out of ' . $class_rankings->count(), // Update rank format
+                'percentage' => number_format($average_score, 1)
             ];
 
             // Add school details
@@ -747,12 +853,12 @@ class ReportCardController extends Controller
     private function getOrdinalSuffix($number) {
         if (!in_array(($number % 100), [11, 12, 13])) {
             switch ($number % 10) {
-                case 1:  return 'st';
-                case 2:  return 'nd';
-                case 3:  return 'rd';
+                case 1:  return $number . 'st';
+                case 2:  return $number . 'nd';
+                case 3:  return $number . 'rd';
             }
         }
-        return 'th';
+        return $number . 'th';
     }
 
     private function sanitizeFileName($filename)
@@ -803,5 +909,19 @@ class ReportCardController extends Controller
             default:
                 return 'BE'; // Below Expectation
         }
+    }
+
+    public function getStudentsByClass(Request $request)
+    {
+        $request->validate([
+            'class_id' => 'required|integer|exists:classes,id'
+        ]);
+
+        $students = Student::where('school_class_id', $request->query('class_id'))
+            ->select('id', 'first_name', 'last_name')
+            ->orderBy('first_name')
+            ->get();
+
+        return response()->json($students);
     }
 }

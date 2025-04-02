@@ -24,6 +24,14 @@ class Term extends Model
         'end_date' => 'date',
     ];
 
+    // Add appends to automatically include formatted name
+    protected $appends = ['formatted_name'];
+
+    public function getFormattedNameAttribute()
+    {
+        return "{$this->name} ({$this->academic_year})";
+    }
+
     public function exams()
     {
         return $this->hasMany(Exam::class);

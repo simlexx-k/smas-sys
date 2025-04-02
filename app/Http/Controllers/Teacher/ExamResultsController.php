@@ -239,7 +239,6 @@ class ExamResultsController extends Controller
 
         try {
             foreach ($request->results as $result) {
-                $score = floatval($result['score']);
                 ReportCard::updateOrCreate(
                     [
                         'student_id' => $result['student_id'],
@@ -247,9 +246,7 @@ class ExamResultsController extends Controller
                         'subject_id' => $request->subject_id,
                     ],
                     [
-                        'score' => $score,
-                        'grade' => $this->calculateGrade($score),
-                        'remarks' => $this->generateRemarks($score),
+                        'score' => floatval($result['score']),
                         'tenant_id' => $request->user()->tenant_id,
                     ]
                 );

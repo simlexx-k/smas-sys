@@ -276,7 +276,7 @@ function toggleExpand(classId: number) {
   expandedClasses.value[classId] = !expandedClasses.value[classId];
 }
 
-// Update fetchClasses function to include student data
+// Update fetchClasses function to use the new endpoint for students
 async function fetchClasses() {
   try {
     loading.value = true;
@@ -284,25 +284,28 @@ async function fetchClasses() {
     
     const response = await axios.get('/api/classes', {
       params: { 
-        tenant_id: tenantId,
-        include: 'students'
+        tenant_id: tenantId
       }
     });
 
-    console.log('API Response:', response.data);
-
     if (response.data && Array.isArray(response.data.data)) {
-      classes.value = response.data.data.map(classItem => ({
-        id: classItem.id,
-        name: classItem.name,
-        student_count: classItem.students?.length || 0,
-        students: classItem.students?.map(student => ({
-          id: student.id,
-          full_name: student.full_name || `${student.first_name} ${student.last_name}`
-        })) || []
-      })).filter(classItem => classItem.id && typeof classItem.id === 'number');
+      classes.value = await Promise.all(response.data.data.map(async classItem => {
+        // Fetch students for each class
+        const studentsResponse = await axios.get('/api/report-cards/students-by-class', {
+          params: { 
+            class_id: classItem.id
+          }
+        });
 
-      console.log('Processed classes:', classes.value);
+        return {
+          id: classItem.id,
+          name: classItem.name,
+          student_count: studentsResponse.data.length,
+          students: studentsResponse.data
+        };
+      }));
+
+      console.log('Processed classes with students:', classes.value);
     } else {
       throw new Error('Invalid response format from API');
     }
@@ -468,10 +471,19 @@ async function fetchExams(classId: number) {
   }
 }
 
-// Add this computed property
+// Update the computed property for selected class students
 const selectedClassStudents = computed(() => {
   const selectedClassData = classes.value.find(c => c.id === selectedClass.value);
   return selectedClassData?.students || [];
+});
+
+// Add error handling for empty student lists
+watch(selectedClassStudents, (newStudents) => {
+  if (selectedClass.value && (!newStudents || newStudents.length === 0)) {
+    error.value = 'No students found in this class';
+  } else {
+    error.value = null;
+  }
 });
 
 // Initial fetch

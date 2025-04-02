@@ -48,6 +48,9 @@
                   <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Date
                   </th>
+                  <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Status
+                  </th>
                   <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Actions
                   </th>
@@ -62,7 +65,12 @@
                     {{ exam.subject?.name }}
                   </td>
                   <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                    {{ new Date(exam.date).toLocaleDateString() }}
+                    {{ new Date(exam.start_date).toLocaleDateString() }} - {{ new Date(exam.end_date).toLocaleDateString() }}
+                  </td>
+                  <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                    <span :class="['px-2 py-1 text-xs font-semibold rounded-full', getStatusColor(exam.status)]">
+                      {{ exam.status }}
+                    </span>
                   </td>
                   <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                     <button
@@ -165,32 +173,56 @@
                       <div class="mt-2">
                         <form @submit.prevent="saveExam">
                           <div class="mb-4">
-                            <label class="block text-sm font-medium text-gray-700">Exam Name</label>
+                            <label class="block text-sm font-medium text-gray-700">Term</label>
+                            <select
+                              v-model="form.term_id"
+                              class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+                              required
+                            >
+                              <option value="">Select a term</option>
+                              <option v-for="term in terms" :key="term.id" :value="term.id">
+                                {{ term.name }}
+                              </option>
+                            </select>
+                          </div>
+                          <div class="mb-4">
+                            <label class="block text-sm font-medium text-gray-700">Name</label>
                             <input
                               v-model="form.name"
                               type="text"
-                              class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
+                              class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
                               required
                             />
                           </div>
                           <div class="mb-4">
-                            <label class="block text-sm font-medium text-gray-700">Date</label>
+                            <label class="block text-sm font-medium text-gray-700">Start Date</label>
                             <input
-                              v-model="form.date"
+                              v-model="form.start_date"
                               type="date"
-                              class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
+                              class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
                               required
                             />
                           </div>
                           <div class="mb-4">
-                            <label class="block text-sm font-medium text-gray-700">Tenant</label>
+                            <label class="block text-sm font-medium text-gray-700">End Date</label>
                             <input
-                              v-model="form.tenant_id"
-                              type="text"
-                              class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
+                              v-model="form.end_date"
+                              type="date"
+                              class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
                               required
-                              disabled
                             />
+                          </div>
+                          <div class="mb-4">
+                            <label class="block text-sm font-medium text-gray-700">Status</label>
+                            <select
+                              v-model="form.status"
+                              class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+                              required
+                            >
+                              <option v-for="option in statusOptions" :key="option.value" :value="option.value">
+                                {{ option.label }}
+                              </option>
+                            </select>
                           </div>
                           <div class="flex justify-end">
                             <button
@@ -202,9 +234,10 @@
                             </button>
                             <button
                               type="submit"
-                              class="inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                              :disabled="loading"
+                              class="inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50"
                             >
-                              Save
+                              {{ loading ? 'Saving...' : (isEditing ? 'Update' : 'Create') }}
                             </button>
                           </div>
                         </form>
@@ -292,6 +325,7 @@ import jsPDF from 'jspdf';
 import 'jspdf-autotable';
 import axios from 'axios';
 import { usePage } from '@inertiajs/vue3';
+import { useToast } from 'vue-toastification';
 
 interface Exam {
   id: number;
@@ -317,12 +351,16 @@ const loading = ref(false);
 const error = ref<string | null>(null);
 const form = ref({
   id: null,
-  tenant_id: tenantId,
+  tenant_id: usePage().props.auth?.user?.tenant?.id,
+  term_id: '',
   name: '',
-  date: '',
+  start_date: '',
+  end_date: '',
+  status: 'draft'
 });
 
 const subjects = ref([]);
+const terms = ref([]);
 
 const breadcrumbs = [
   {
@@ -419,18 +457,24 @@ const fetchSubjects = async () => {
 
 const fetchExams = async () => {
   try {
-    const response = await axios.get('/api/exams', {
-      params: { tenant_id: tenantId }
-    });
+    const response = await axios.get('/api/exams');
     exams.value = response.data;
-  } catch (err) {
-    error.value = 'Failed to fetch exams';
-    console.error(err);
+  } catch (error) {
+    toast.error('Failed to fetch exams');
+  }
+};
+
+const fetchTerms = async () => {
+  try {
+    const response = await axios.get('/api/terms');
+    terms.value = response.data;
+  } catch (error) {
+    toast.error('Failed to fetch terms');
   }
 };
 
 const openCreateModal = () => {
-  form.value = { id: null, tenant_id: tenantId, name: '', date: '' };
+  form.value = { id: null, tenant_id: tenantId, term_id: '', name: '', start_date: '', end_date: '', status: 'draft' };
   isEditing.value = false;
   showModal.value = true;
 };
@@ -464,7 +508,7 @@ const showErrorToast = (message) => {
 };
 
 const validateForm = () => {
-  if (!form.value.name || !form.value.date) {
+  if (!form.value.name || !form.value.start_date || !form.value.end_date) {
     showErrorToast('Please fill all required fields');
     return false;
   }
@@ -475,6 +519,7 @@ const saveExam = async () => {
   if (!validateForm()) return;
 
   try {
+    loading.value = true;
     if (isEditing.value) {
       await axios.put(`/api/exams/${form.value.id}`, form.value);
       showSuccessToast('Exam updated successfully');
@@ -482,10 +527,12 @@ const saveExam = async () => {
       await axios.post('/api/exams', form.value);
       showSuccessToast('Exam created successfully');
     }
-    fetchExams();
+    await fetchExams();
     closeModal();
-  } catch (err) {
-    showErrorToast('Error saving exam');
+  } catch (error: any) {
+    showErrorToast(error.response?.data?.error || 'Failed to save exam');
+  } finally {
+    loading.value = false;
   }
 };
 
@@ -512,9 +559,33 @@ const proceedWithDelete = async () => {
   }
 };
 
+const toast = useToast();
+
+// Status options for the select dropdown
+const statusOptions = [
+  { value: 'draft', label: 'Draft' },
+  { value: 'active', label: 'Active' },
+  { value: 'completed', label: 'Completed' }
+];
+
+// Get status badge color
+const getStatusColor = (status: string) => {
+  switch (status) {
+    case 'draft':
+      return 'bg-gray-100 text-gray-800';
+    case 'active':
+      return 'bg-green-100 text-green-800';
+    case 'completed':
+      return 'bg-blue-100 text-blue-800';
+    default:
+      return 'bg-gray-100 text-gray-800';
+  }
+};
+
 onMounted(() => {
   fetchSubjects();
   fetchExams();
+  fetchTerms();
 });
 </script>
 

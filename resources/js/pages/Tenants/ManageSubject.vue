@@ -4,6 +4,7 @@ import AppLayout from '@/layouts/AppLayout.vue';
 import { ref, onMounted } from 'vue';
 import axios from 'axios';
 import { usePage } from '@inertiajs/vue3';
+import { useToast } from 'vue-toastification';
 
 interface Subject {
   id?: number;
@@ -28,6 +29,8 @@ const form = ref<Subject>({
   code: ''
 });
 
+const toast = useToast();
+
 const showToast = ref(false);
 const toastMessage = ref('');
 const toastType = ref('success');
@@ -48,15 +51,15 @@ const showErrorToast = (message: string) => {
 
 const validateForm = () => {
   if (!form.value.name) {
-    showErrorToast('Subject name is required');
+    toast.error('Subject name is required');
     return false;
   }
   if (!form.value.code) {
-    showErrorToast('Subject code is required');
+    toast.error('Subject code is required');
     return false;
   }
   if (!form.value.class_id) {
-    showErrorToast('Class ID is required');
+    toast.error('Class is required');
     return false;
   }
   return true;
@@ -79,14 +82,30 @@ const saveSubject = async () => {
 
     if (subjectId.value) {
       await axios.put(`/api/subjects/${subjectId.value}`, payload);
-      showSuccessToast('Subject updated successfully');
+      toast.success('Subject updated successfully!');
     } else {
       await axios.post('/api/subjects', payload);
-      showSuccessToast('Subject created successfully');
+      toast.success('Subject created successfully!');
     }
+    
+    // Navigate back after success
+    setTimeout(() => {
+      goBack();
+    }, 1500);
+
   } catch (err) {
     console.error('Save operation failed:', err);
-    showErrorToast('Failed to save subject: ' + err.message);
+    if (err.response?.data?.message) {
+      toast.error(err.response.data.message);
+    } else if (err.response?.data?.errors) {
+      // Handle validation errors
+      const errors = err.response.data.errors;
+      Object.values(errors).forEach((error: any) => {
+        toast.error(error[0]);
+      });
+    } else {
+      toast.error('Failed to save subject: ' + err.message);
+    }
   } finally {
     loading.value = false;
   }
@@ -119,7 +138,7 @@ const fetchClasses = async () => {
     classes.value = response.data.data;
   } catch (err) {
     console.error('Failed to fetch classes:', err);
-    showErrorToast('Failed to load classes');
+    toast.error('Failed to load classes');
   }
 };
 
@@ -248,3 +267,23 @@ onMounted(async () => {
     </div>
   </AppLayout>
 </template>
+
+<style>
+/* Toast customization styles */
+.Vue-Toastification__toast {
+  padding: 1rem;
+  border-radius: 0.5rem;
+}
+
+.Vue-Toastification__toast--success {
+  background-color: #059669 !important;
+}
+
+.Vue-Toastification__toast--error {
+  background-color: #dc2626 !important;
+}
+
+.Vue-Toastification__toast--warning {
+  background-color: #d97706 !important;
+}
+</style>

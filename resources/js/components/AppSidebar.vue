@@ -6,7 +6,7 @@ import NavUser from '@/components/NavUser.vue';
 import { Sidebar, SidebarContent, SidebarFooter, SidebarHeader, SidebarMenu, SidebarMenuButton, SidebarMenuItem } from '@/components/ui/sidebar';
 import { type NavItem } from '@/types';
 import { Link, usePage } from '@inertiajs/vue3';
-import { BookOpen, LayoutGrid, PlusIcon, SchoolIcon, Building, CreditCard, Settings, Users, BookOpenCheck, GraduationCap, ScrollText } from 'lucide-vue-next';
+import { BookOpen, LayoutGrid, PlusIcon, SchoolIcon, Building, CreditCard, Settings, Users, BookOpenCheck, GraduationCap, ScrollText, Paperclip, TrendingDown } from 'lucide-vue-next';
 import AppLogo from './AppLogo.vue';
 
 const isMounted = ref(false);
@@ -74,6 +74,11 @@ const mainNavItems: NavItem[] = [
             icon: BookOpen,
         },
         {
+            title: 'Terms',
+            href: route('tenant.terms'),
+            icon: TrendingDown,
+        },
+        {
             title: 'Exams',
             href: '/exams',
             icon: BookOpen,
@@ -93,6 +98,11 @@ const mainNavItems: NavItem[] = [
             title: 'Academics',
             href: '/teacher/exam-results',
             icon: ScrollText,
+        },
+        {
+            title: 'Reports',
+            href: '/teacher/reports',
+            icon: Paperclip,
         }
     ] : []),
 ];

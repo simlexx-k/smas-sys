@@ -158,9 +158,55 @@ class TenantController extends Controller
             ]);
         }
 
+        // Get classes with only existing columns
+        $classes = $tenant->classes()
+            ->select('id', 'name')  // Remove grade since it might not exist yet
+            ->orderBy('name')
+            ->get()
+            ->map(function ($class) {
+                return [
+                    'id' => $class->id,
+                    'name' => $class->name,
+                    'value' => $class->id
+                ];
+            });
+
         return Inertia::render('Tenants/Students', [
             'tenant' => $tenant,
+            'classes' => $classes,
+            'filters' => [
+                'class_options' => $classes->map(function ($class) {
+                    return [
+                        'id' => $class['id'],
+                        'label' => $class['name']
+                    ];
+                })
+            ]
         ]);
+    }
+
+    public function getClasses(Request $request)
+    {
+        // Get tenant from authenticated user instead of request
+        $tenant = auth()->user()->tenant;
+        
+        if (!$tenant) {
+            return response()->json(['error' => 'Tenant not found'], 404);
+        }
+
+        $classes = $tenant->classes()
+            ->select('id', 'name')
+            ->orderBy('name')
+            ->get()
+            ->map(function ($class) {
+                return [
+                    'id' => $class->id,
+                    'name' => $class->name,
+                    'value' => $class->id
+                ];
+            });
+
+        return response()->json(['data' => $classes]);
     }
 
     public function teachers()

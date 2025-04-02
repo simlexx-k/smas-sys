@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\TermController;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
 use App\Http\Controllers\TenantController;
@@ -14,11 +15,21 @@ use App\Http\Controllers\Teacher\ClassController as TeacherClassController;
 use App\Http\Controllers\Teacher\AttendanceController as TeacherAttendanceController;
 use App\Http\Controllers\TeacherController;
 use App\Http\Controllers\Teacher\ExamResultsController;
+use App\Http\Controllers\Teacher\ReportController;
+use App\Http\Controllers\Auth\SchoolRegistrationController;
 
 // Public routes
 Route::get('/', function () {
     return Inertia::render('Welcome');
 })->name('home');
+
+// School Registration Routes
+Route::get('/register/school', function () {
+    return Inertia::render('auth/RegisterSchool');
+})->name('register.school');
+
+Route::post('/register/school', [SchoolRegistrationController::class, 'store'])
+    ->name('register.school.store');
 
 Route::get('/admin-redirect', [TenantController::class, 'adminRedirect'])->name('admin.redirect');
 
@@ -114,6 +125,9 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('/exams', [TenantController::class, 'exams'])->name('tenant.exams');
         Route::get('/subjects', [TenantController::class, 'subjects'])->name('tenant.subjects');
         Route::get('/manage-subject/{id?}', [TenantController::class, 'manageSubject'])->name('manage-subject');
+        Route::get('/terms', function () {
+            return Inertia::render('Tenants/Terms');
+        })->name('tenant.terms');
         Route::get('/batch-print-report-cards', function () {
             return Inertia::render('Tenants/BatchPrintReportCards');
         })->name('batch-print-report-cards');
@@ -156,6 +170,13 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('/teacher/students', [TeacherDashboardController::class, 'students'])
         ->middleware(['auth', 'role:teacher'])
         ->name('teacher.students');
+
+    Route::prefix('teacher')->name('teacher.')->group(function () {
+        Route::get('/reports', [ReportController::class, 'index'])->name('reports.index');
+        Route::post('/reports/academic', [ReportController::class, 'generateAcademicReport'])->name('reports.academic');
+        Route::post('/reports/attendance', [ReportController::class, 'generateAttendanceReport'])->name('reports.attendance');
+        Route::get('/reports/download-pdf', [ReportController::class, 'downloadPDF'])->name('reports.download-pdf');
+    });
 });
 
 // API routes

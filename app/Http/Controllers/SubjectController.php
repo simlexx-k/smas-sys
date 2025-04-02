@@ -17,7 +17,7 @@ class SubjectController extends Controller
         $validated = $request->validate([
             'tenant_id' => 'required|integer',
             'name' => 'required|string',
-            'code' => 'required|string|unique:subjects',
+            'code' => 'required|string',
             'description' => 'nullable|string',
             'class_id' => 'required|exists:classes,id',
         ]);
@@ -35,7 +35,7 @@ class SubjectController extends Controller
         $validated = $request->validate([
             'tenant_id' => 'sometimes|integer',
             'name' => 'sometimes|string',
-            'code' => 'sometimes|string|unique:subjects,code,' . $subject->id,
+            'code' => 'sometimes|string',
             'description' => 'nullable|string',
             'class_id' => 'sometimes|exists:classes,id',
         ]);

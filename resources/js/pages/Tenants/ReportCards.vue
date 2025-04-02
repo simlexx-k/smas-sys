@@ -34,12 +34,23 @@
             </div>
             <div>
               <label class="block text-sm font-medium text-gray-700 mb-1">Student</label>
-              <select v-model="filters.student_id" class="form-select w-full rounded-md">
-                <option value="">All Students</option>
-                <option v-for="student in filteredStudents" :key="student.id" :value="student.id">
+              <select 
+                v-model="filters.student_id" 
+                class="form-select w-full rounded-md"
+                :disabled="!filters.class_id"
+              >
+                <option value="">{{ filters.class_id ? 'Select Student' : 'Select a class first' }}</option>
+                <option 
+                  v-for="student in filteredStudents" 
+                  :key="student.id" 
+                  :value="student.id"
+                >
                   {{ student.full_name }}
                 </option>
               </select>
+              <div v-if="filters.class_id" class="text-xs text-gray-500 mt-1">
+                {{ filteredStudents.length }} students found
+              </div>
             </div>
             <div>
               <label class="block text-sm font-medium text-gray-700 mb-1">Exam</label>
@@ -207,7 +218,7 @@
   </template>
   
   <script setup lang="ts">
-  import { ref, computed, watch, nextTick } from 'vue';
+  import { ref, computed, watch, nextTick, onMounted } from 'vue';
   import { Head, Link } from '@inertiajs/vue3';
   import AppLayout from '@/layouts/AppLayout.vue';
   import axios from 'axios';
@@ -305,8 +316,18 @@
   
   // Add computed property for filtered students
   const filteredStudents = computed(() => {
-    if (!filters.value.class_id) return students.value;
-    return students.value.filter(student => student.school_class_id === filters.value.class_id);
+    console.log('Computing filtered students:', {
+      classId: filters.value.class_id,
+      allStudents: students.value,
+      filtered: students.value.filter(student => 
+        student.school_class_id === parseInt(filters.value.class_id)
+      )
+    });
+    
+    if (!filters.value.class_id) return [];
+    return students.value.filter(student => 
+      student.school_class_id === parseInt(filters.value.class_id)
+    );
   });
   
   // Add these refs at the top with other refs
@@ -328,9 +349,15 @@
   }, { deep: true });
   
   // Add watch for class_id to reset student_id when class changes
-  watch(() => filters.value.class_id, () => {
-    filters.value.student_id = '';
-  });
+  watch(() => filters.value.class_id, async (newVal, oldVal) => {
+    console.log('Class changed from', oldVal, 'to', newVal);
+    if (newVal) {
+      await fetchStudents();
+    } else {
+      students.value = [];
+    }
+    filters.value.student_id = ''; // Reset student selection when class changes
+  }, { immediate: true });
   
   const page = usePage();
   const tenantId = computed(() => page.props.tenant?.id);
@@ -352,24 +379,23 @@
     }
   }
   
-  async function fetchStudents() {
+  const fetchStudents = async () => {
     try {
-      const response = await axios.get('/api/students', {
+      console.log('Fetching students for class:', filters.value.class_id);
+      const response = await axios.get('/api/report-cards/students-by-class', {
         params: {
-          tenant_id: tenantId.value,
-          paginate: false
+          class_id: filters.value.class_id
         }
       });
-      if (response.data.data) {
-        students.value = response.data.data;
-      } else {
-        students.value = response.data;
-      }
+      
+      students.value = response.data;
       console.log('Students loaded:', students.value);
     } catch (error) {
       console.error('Error fetching students:', error);
+      toast.error('Failed to fetch students');
+      students.value = [];
     }
-  }
+  };
   
   async function fetchExams() {
     try {
@@ -407,7 +433,7 @@
     }
   }
   
-  async function fetchClasses() {
+  const fetchClasses = async () => {
     try {
       if (!tenantId.value) {
         console.error('No tenant ID available');
@@ -420,15 +446,13 @@
           paginate: false
         }
       });
-      if (response.data.data) {
-        classes.value = response.data.data;
-      } else {
-        classes.value = response.data;
-      }
+      
+      classes.value = response.data.data || response.data;
     } catch (error) {
       console.error('Error fetching classes:', error);
+      toast.error('Failed to fetch classes');
     }
-  }
+  };
   
   // Add modalFilters ref
   const modalFilters = ref({
@@ -437,12 +461,10 @@
   
   // Add computed for modal filtered students
   const modalFilteredStudents = computed(() => {
-    if (!modalFilters.value.class_id) return [];  // Return empty array instead of all students
-    
-    return students.value.filter(student => {
-      // Convert both to numbers for comparison
-      return Number(student.school_class_id) === Number(modalFilters.value.class_id);
-    });
+    if (!modalFilters.value.class_id) return [];
+    return students.value.filter(student => 
+      student.school_class_id === parseInt(modalFilters.value.class_id)
+    );
   });
   
   function openCreateModal() {
@@ -625,25 +647,26 @@
   });
   
   console.log('Tenant ID on load:', usePage().props.tenant.id);
-  async function fetchInitialData() {
+  onMounted(async () => {
     isLoading.value = true;
     try {
       await Promise.all([
-        fetchReportCards(),
-        fetchStudents(),
+        fetchClasses(),
         fetchExams(),
-        fetchSubjects(),
-        fetchClasses()
+        fetchSubjects()
       ]);
+      // Only fetch students if a class is selected
+      if (filters.value.class_id) {
+        await fetchStudents();
+      }
+      await fetchReportCards();
     } catch (error) {
-      toast.error("Failed to load initial data");
-      console.error('Error loading initial data:', error);
+      console.error('Error initializing data:', error);
+      toast.error('Failed to load initial data');
     } finally {
       isLoading.value = false;
     }
-  }
-  
-  fetchInitialData();
+  });
   </script>
   
   <style scoped>

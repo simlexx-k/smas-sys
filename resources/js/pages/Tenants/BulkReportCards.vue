@@ -51,8 +51,6 @@
               <tr>
                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Student</th>
                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Score</th>
-                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Grade</th>
-                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Remarks</th>
                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
               </tr>
             </thead>
@@ -67,20 +65,7 @@
                     min="0"
                     max="100"
                     step="0.01"
-                  >
-                </td>
-                <td class="px-6 py-4 whitespace-nowrap">
-                  <input 
-                    type="text" 
-                    v-model="scores[student.id].grade" 
-                    class="form-input w-24 rounded-md"
-                  >
-                </td>
-                <td class="px-6 py-4 whitespace-nowrap">
-                  <input 
-                    type="text" 
-                    v-model="scores[student.id].remarks" 
-                    class="form-input w-full rounded-md"
+                    @input="validateScore($event, student.id)"
                   >
                 </td>
                 <td class="px-6 py-4 whitespace-nowrap">
@@ -97,17 +82,24 @@
             </tbody>
           </table>
         </div>
-        
-        <!-- Save Button -->
-        <div class="p-4 bg-gray-50 border-t border-gray-200">
-          <button 
-            @click="saveScores" 
-            class="btn-primary"
-            :disabled="!isValid || isSaving"
-          >
-            {{ isSaving ? 'Saving...' : 'Save All Scores' }}
-          </button>
-        </div>
+      </div>
+
+      <!-- Save Button -->
+      <div class="mt-6 flex justify-end">
+        <button
+          @click="saveScores"
+          :disabled="!isValid || isSaving"
+          class="btn-primary"
+        >
+          <span v-if="!isSaving">Save Scores</span>
+          <span v-else class="flex items-center">
+            <svg class="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+              <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+              <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+            </svg>
+            Saving...
+          </span>
+        </button>
       </div>
     </div>
   </AppLayout>
@@ -142,14 +134,23 @@ interface Subject {
   name: string;
 }
 
+interface Score {
+  score: number | null;
+}
+
 interface ReportCard {
   id: number;
   student_id: number;
   exam_id: number;
   subject_id: number;
-  score: number;
-  grade: string;
-  remarks: string;
+  score: string;
+  student: {
+    id: number;
+    first_name: string;
+    last_name: string;
+    full_name: string;
+    school_class_id: number;
+  };
 }
 
 // Setup refs and state
@@ -177,8 +178,8 @@ const filters = ref({
   subject_id: ''
 });
 
-const scores = ref<Record<number, { score: number | null; grade: string; remarks: string }>>({});
-const existingReportCards = ref<Record<number, ReportCard>>({});
+const scores = ref<{ [key: number]: Score }>({});
+const existingReportCards = ref<{ [key: number]: ReportCard }>({});
 
 const breadcrumbs = [
   { title: 'Report Cards', href: '/report-cards' },
@@ -191,40 +192,36 @@ const showTable = computed(() => {
 });
 
 const filteredStudents = computed(() => {
-  if (!filters.value.class_id) return [];
-  return students.value.filter(student => 
-    Number(student.school_class_id) === Number(filters.value.class_id)
-  );
+  if (!students.value.length) return [];
+  
+  return students.value.map(student => {
+    // Initialize score object if it doesn't exist
+    if (!scores.value[student.id]) {
+      scores.value[student.id] = {
+        score: null
+      };
+    }
+    return {
+      ...student,
+      hasExistingScore: !!existingReportCards.value[student.id]
+    };
+  });
 });
 
 const isValid = computed(() => {
-  return filteredStudents.value.every(student => {
-    const score = scores.value[student.id]?.score;
-    return score !== null && score >= 0 && score <= 100;
+  return Object.values(scores.value).every(score => {
+    return score.score !== null && 
+           score.score >= 0 && 
+           score.score <= 100;
   });
 });
 
 // Watchers
 watch(
-  // Watch the individual filter values instead of the array
-  [
-    () => filters.value.class_id,
-    () => filters.value.exam_id,
-    () => filters.value.subject_id
-  ],
+  [() => filters.value.class_id, () => filters.value.exam_id, () => filters.value.subject_id],
   async ([newClassId, newExamId, newSubjectId]) => {
-    // Clear existing data when filters change
-    existingReportCards.value = {};
-    
     if (newClassId && newExamId && newSubjectId) {
       try {
-        console.log('Fetching report cards with params:', {
-          tenant_id: tenantId.value,
-          class_id: newClassId,
-          exam_id: newExamId,
-          subject_id: newSubjectId
-        });
-
         const response = await axios.get('/api/report-cards', {
           params: {
             tenant_id: tenantId.value,
@@ -233,35 +230,39 @@ watch(
             subject_id: newSubjectId
           }
         });
-        
-        console.log('Received report cards:', response.data);
-        
-        // Create a map of student_id to report card
-        existingReportCards.value = response.data.reduce((acc: Record<number, ReportCard>, card: ReportCard) => {
-          acc[card.student_id] = card;
-          return acc;
-        }, {});
 
-        // Initialize scores with existing data
-        filteredStudents.value.forEach(student => {
-          const existingCard = existingReportCards.value[student.id];
-          if (existingCard) {
-            console.log('Found existing card for student:', student.id, existingCard);
-          }
-          scores.value[student.id] = {
-            score: existingCard?.score ?? null,
-            grade: existingCard?.grade ?? '',
-            remarks: existingCard?.remarks ?? ''
-          };
-        });
+        // Reset scores and existing report cards
+        scores.value = {};
+        existingReportCards.value = {};
+
+        // Populate only scores from existing report cards
+        if (Array.isArray(response.data)) {
+          response.data.forEach((reportCard) => {
+            if (reportCard.student_id) {
+              scores.value[reportCard.student_id] = {
+                score: reportCard.score ? parseFloat(reportCard.score) : null
+              };
+              existingReportCards.value[reportCard.student_id] = reportCard;
+            }
+          });
+        }
+
       } catch (error) {
-        console.error('Error fetching existing report cards:', error);
-        toast.error('Failed to load existing scores');
+        console.error('Error fetching report cards:', error);
+        toast.error('Failed to fetch existing report cards');
       }
     }
   },
-  { immediate: true } // This will run the watcher immediately when component mounts
+  { immediate: true }
 );
+
+watch(() => filters.value.class_id, async (newVal) => {
+  if (newVal) {
+    await fetchStudents();
+  } else {
+    students.value = [];
+  }
+});
 
 // API Functions
 async function fetchClasses() {
@@ -322,53 +323,57 @@ async function fetchSubjects() {
 }
 
 async function fetchStudents() {
-  if (!tenantId.value) {
-    toast.error('Tenant ID is required');
+  if (!tenantId.value || !filters.value.class_id) {
+    students.value = [];
     return;
   }
 
   try {
-    const response = await axios.get('/api/students', {
+    const response = await axios.get('/api/report-cards/students-by-class', {
       params: { 
-        tenant_id: tenantId.value 
+        class_id: filters.value.class_id
       }
     });
-    students.value = response.data.data || response.data;
+    
+    students.value = response.data;
+    console.log('Students loaded:', students.value);
+
+    // Initialize scores for new students
+    students.value.forEach(student => {
+      if (!scores.value[student.id]) {
+        scores.value[student.id] = {
+          score: null
+        };
+      }
+    });
   } catch (error) {
     console.error('Error fetching students:', error);
     toast.error('Failed to load students');
+    students.value = [];
   }
 }
 
 async function saveScores() {
-  if (!tenantId.value) {
-    toast.error('Tenant ID is required');
-    return;
-  }
-
   if (!isValid.value) {
-    toast.error('Please enter valid scores for all students');
+    toast.error('Please enter valid scores (0-100) for all students');
     return;
   }
 
-  isSaving.value = true;
   try {
+    isSaving.value = true;
     const reportCards = filteredStudents.value.map(student => ({
       student_id: student.id,
       exam_id: filters.value.exam_id,
       subject_id: filters.value.subject_id,
-      score: scores.value[student.id].score,
-      grade: scores.value[student.id].grade,
-      remarks: scores.value[student.id].remarks,
-      tenant_id: tenantId.value
+      tenant_id: tenantId.value,
+      score: scores.value[student.id].score
     }));
 
     await axios.post('/api/report-cards/bulk', reportCards);
     toast.success('Scores saved successfully');
-    scores.value = {};
   } catch (error) {
-    toast.error(error.response?.data?.message || 'Failed to save scores');
     console.error('Error saving scores:', error);
+    toast.error('Failed to save scores');
   } finally {
     isSaving.value = false;
   }
@@ -387,7 +392,7 @@ if (tenantId.value) {
 
 <style scoped>
 .btn-primary {
-  @apply bg-indigo-600 text-white px-4 py-2 rounded-md hover:bg-indigo-700;
+  @apply bg-indigo-600 text-white px-4 py-2 rounded-md hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed;
 }
 
 .btn-secondary {

@@ -32,8 +32,23 @@
         </div>
       </div>
 
-            <!-- Subjects Table -->
-            <div class="overflow-x-auto bg-white rounded-lg shadow">
+      <!-- Loading State -->
+      <div v-if="isLoading" class="bg-white rounded-lg shadow">
+        <div class="animate-pulse">
+          <div class="h-16 bg-gray-200 rounded-t-lg"></div>
+          <div class="p-4 space-y-3">
+            <div v-for="n in 5" :key="n" class="flex items-center space-x-4">
+              <div class="h-4 bg-gray-200 rounded w-1/4"></div>
+              <div class="h-4 bg-gray-200 rounded w-1/6"></div>
+              <div class="h-4 bg-gray-200 rounded w-1/3"></div>
+              <div class="h-4 bg-gray-200 rounded w-1/6"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Subjects Table -->
+      <div v-else class="overflow-x-auto bg-white rounded-lg shadow">
         <table class="min-w-full divide-y divide-gray-200">
           <thead class="bg-gray-50">
             <tr>
@@ -55,6 +70,24 @@
             </tr>
           </tbody>
         </table>
+      </div>
+
+      <!-- Empty State -->
+      <div v-if="!isLoading && subjects.length === 0" class="text-center py-12 bg-white rounded-lg shadow">
+        <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+        </svg>
+        <h3 class="mt-2 text-sm font-medium text-gray-900">No subjects</h3>
+        <p class="mt-1 text-sm text-gray-500">Get started by creating a new subject.</p>
+        <div class="mt-6">
+          <button
+            @click="navigateToCreateSubject"
+            class="inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+          >
+            <PlusCircle class="w-5 h-5 mr-2" />
+            Add Subject
+          </button>
+        </div>
       </div>
 
       <!-- Pagination -->
@@ -200,6 +233,7 @@ import AppLayout from '@/layouts/AppLayout.vue';
 import { Head, usePage, router } from '@inertiajs/vue3';
 import { Search } from 'lucide-vue-next';
 import Pagination from '@/components/Pagination.vue';
+import { useToast } from "vue-toastification";
 
 // Add these defaults to ensure cookies are sent with requests
 axios.defaults.withCredentials = true;
@@ -262,6 +296,11 @@ const form = ref<SubjectForm>({
 });
 
 const allowOverride = ref(false);
+
+const toast = useToast();
+
+// Add loading state
+const isLoading = ref(true);
 
 const navigateToCreateSubject = () => {
   router.visit(route('manage-subject'));
@@ -340,12 +379,16 @@ const saveSubject = async () => {
   try {
     if (isEditing.value && form.value.id) {
       await axios.put(`/api/subjects/${form.value.id}`, form.value);
+      toast.success("Subject updated successfully!");
     } else {
       await axios.post('/api/subjects', form.value);
+      toast.success("Subject created successfully!");
     }
     await fetchSubjects();
     closeModal();
   } catch (error) {
+    const errorMessage = error.response?.data?.message || "An error occurred while saving the subject";
+    toast.error(errorMessage);
     console.error('Error saving subject:', error);
   }
 };
@@ -354,8 +397,10 @@ const confirmDelete = async (id: number) => {
   if (confirm('Are you sure you want to delete this subject?')) {
     try {
       await axios.delete(`/api/subjects/${id}`);
+      toast.success("Subject deleted successfully!");
       await fetchSubjects();
     } catch (error) {
+      toast.error("Failed to delete subject");
       console.error('Error deleting subject:', error);
     }
   }
@@ -363,10 +408,14 @@ const confirmDelete = async (id: number) => {
 
 const fetchSubjects = async () => {
   try {
+    isLoading.value = true;
     const response = await axios.get('/api/subjects');
     subjects.value = response.data;
   } catch (error) {
+    toast.error("Failed to fetch subjects");
     console.error('Error fetching subjects:', error);
+  } finally {
+    isLoading.value = false;
   }
 };
 
@@ -375,8 +424,10 @@ const fetchClasses = async () => {
     const response = await axios.get(`/api/classes?tenant_id=${tenantId}`);
     classes.value = response.data.data;
   } catch (error) {
+    toast.error("Failed to fetch classes");
     console.error('Error fetching classes:', error.response?.data || error.message);
     if (error.response?.status === 401) {
+      toast.warning("Session expired. Please refresh the page.");
       console.log('Session may have expired, refreshing page...');
       window.location.reload();
     }
@@ -432,4 +483,38 @@ onMounted(async () => {
 
 <style scoped>
 /* Add custom styles here */
+</style>
+
+<style>
+/* Custom toast styles */
+.Vue-Toastification__toast {
+  padding: 1rem;
+  border-radius: 0.5rem;
+}
+
+.Vue-Toastification__toast--success {
+  background-color: #059669 !important;
+}
+
+.Vue-Toastification__toast--error {
+  background-color: #dc2626 !important;
+}
+
+.Vue-Toastification__toast--warning {
+  background-color: #d97706 !important;
+}
+
+/* Add loading animation styles */
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: .5;
+  }
+}
+
+.animate-pulse {
+  animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
 </style>

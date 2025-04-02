@@ -21,7 +21,14 @@ class SubjectController extends Controller
     {
         $validated = $request->validate([
             'name' => 'required|string|max:255',
-            'code' => 'required|string|max:50|unique:subjects',
+            'code' => [
+                'required',
+                'string',
+                'max:50',
+                Rule::unique('subjects')->where(function ($query) use ($request) {
+                    return $query->where('tenant_id', $request->tenant_id);
+                })
+            ],
             'description' => 'nullable|string',
             'class_id' => 'required|exists:classes,id',
             'tenant_id' => 'required|exists:tenants,id'
@@ -47,8 +54,14 @@ class SubjectController extends Controller
 
         $validated = $request->validate([
             'name' => 'required|string|max:255',
-            'code' => ['required', 'string', 'max:50', 
-                Rule::unique('subjects')->ignore($subject->id)],
+            'code' => [
+                'required',
+                'string',
+                'max:50',
+                Rule::unique('subjects')->where(function ($query) use ($request, $subject) {
+                    return $query->where('tenant_id', $subject->tenant_id);
+                })->ignore($subject->id)
+            ],
             'description' => 'nullable|string',
             'class_id' => 'required|exists:classes,id'
         ]);

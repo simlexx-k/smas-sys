@@ -6,6 +6,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use App\Traits\TenantBindable;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use App\Models\ReportCard;
 
 class Student extends Model
 {
@@ -13,7 +14,7 @@ class Student extends Model
 
     protected $fillable = [
         'tenant_id',
-        'class_id',
+        'school_class_id',
         'first_name',
         'last_name',
         'date_of_birth',
@@ -24,6 +25,10 @@ class Student extends Model
     ];
 
     protected $appends = ['full_name'];
+
+    protected $casts = [
+        'date_of_birth' => 'date'
+    ];
 
     public function getFullNameAttribute()
     {
@@ -40,7 +45,7 @@ class Student extends Model
         return $this->belongsTo(Guardian::class);
     }
 
-    public function class()
+    public function schoolClass()
     {
         return $this->belongsTo(SchoolClass::class, 'school_class_id');
     }
@@ -58,5 +63,10 @@ class Student extends Model
     public function guardians()
     {
         return $this->belongsToMany(Guardian::class);
+    }
+
+    public function reportCards()
+    {
+        return $this->hasMany(ReportCard::class);
     }
 }

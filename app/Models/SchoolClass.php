@@ -12,6 +12,7 @@ use App\Models\Tenant;
 use App\Models\Teacher;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use App\Models\Lesson;
+use App\Models\Subject;
 
 class SchoolClass extends Model
 {
@@ -20,14 +21,18 @@ class SchoolClass extends Model
     protected $table = 'classes';
 
     protected $fillable = [
-        'name', 
-        'grade',
-        'tenant_id'
+        'tenant_id',
+        'name'
     ];
 
     public function students(): HasMany
     {
         return $this->hasMany(Student::class, 'school_class_id');
+    }
+
+    public function subjects(): HasMany
+    {
+        return $this->hasMany(Subject::class, 'class_id');
     }
 
     public function tenant(): BelongsTo
@@ -40,9 +45,9 @@ class SchoolClass extends Model
         return $this->hasMany(Attendance::class);
     }
 
-    public function teachers(): BelongsToMany
+    public function teachers()
     {
-        return $this->belongsToMany(Teacher::class, 'class_teacher', 'school_class_id', 'teacher_id');
+        return $this->belongsToMany(Teacher::class, 'class_teacher');
     }
 
     public function lessons(): HasMany
