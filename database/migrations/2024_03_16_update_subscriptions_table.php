@@ -10,14 +10,14 @@ return new class extends Migration
     {
         Schema::table('subscriptions', function (Blueprint $table) {
             // Add plan_id column after id
-            $table->foreignId('plan_id')
-                ->after('id')
-                ->nullable()
-                ->constrained()
-                ->onDelete('restrict');
+            //$table->foreignId('plan_id')
+               // ->after('id')
+               // ->nullable()
+              //  ->constrained()
+               // ->onDelete('restrict');
 
             // Make plan column nullable since we're transitioning to plan_id
-            $table->string('plan')->nullable()->change();
+           // $table->string('plan')->nullable()->change();
         });
     }
 
@@ -29,7 +29,7 @@ return new class extends Migration
             // Remove the column
             $table->dropColumn('plan_id');
             // Make plan column required again
-            $table->string('plan')->nullable(false)->change();
+            //$table->string('plan')->nullable(false)->change();
         });
     }
 }; 
