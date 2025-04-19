@@ -19,12 +19,12 @@ class ReportCard extends Model
         'tenant_id'
     ];
 
-    public function student(): BelongsTo
+    public function student()
     {
         return $this->belongsTo(Student::class);
     }
 
-    public function exam(): BelongsTo
+    public function exam()
     {
         return $this->belongsTo(Exam::class);
     }

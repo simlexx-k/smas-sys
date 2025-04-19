@@ -25,7 +25,14 @@ class Invoice extends Model
         'tax_rate',
         'tax_amount',
         'total',
-        'notes'
+        'notes',
+        'file_path',
+        'generated_at',
+        'error',
+        'last_sent_at',
+        'sent_to',
+        'send_attempts',
+        'send_error'
     ];
 
     protected $casts = [
@@ -40,14 +47,18 @@ class Invoice extends Model
         'paid_at' => 'datetime'
     ];
 
+    protected $attributes = [
+        'file_path' => '',
+    ];
+
     public function subscription()
     {
-        return $this->belongsTo(Subscription::class);
+        return $this->belongsTo(Subscription::class)->with(['plan', 'tenant']);
     }
 
     public function tenant()
     {
-        return $this->belongsTo(Tenant::class);
+        return $this->belongsTo(Tenant::class)->withTrashed();
     }
 
     public static function generateNumber(): string
@@ -60,5 +71,14 @@ class Invoice extends Model
             ->count() + 1;
         
         return sprintf('%s-%s%s-%04d', $prefix, $year, $month, $count);
+    }
+
+    public function sendInvoice(Tenant $tenant)
+    {
+        $this->update([
+            'last_sent_at' => now(),
+            'sent_to' => $tenant->admin->email,
+            'send_attempts' => $this->send_attempts + 1
+        ]);
     }
 } 

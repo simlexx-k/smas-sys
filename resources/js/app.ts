@@ -11,7 +11,7 @@ import Toast from 'vue-toastification';
 import 'vue-toastification/dist/index.css';
 import VueApexCharts from 'vue3-apexcharts';
 import { initializeTheme } from './composables/useAppearance';
-
+import ChatWidget from './components/ChatWidget.vue';
 const appName = import.meta.env.VITE_APP_NAME || 'Laravel';
 
 createInertiaApp({
@@ -28,15 +28,20 @@ createInertiaApp({
         return page();
     },
     setup({ el, App, props, plugin }) {
-        createApp({ render: () => h(App, props) })
-            .use(plugin)
+        const app = createApp({ render: () => h(App, props) });
+        
+        app.use(plugin)
             .use(ZiggyVue)
             .use(Toast, {
                 position: 'top-right',
                 timeout: 3000,
             })
-            .use(VueApexCharts)
-            .mount(el);
+            .use(VueApexCharts);
+
+        // Register the ChatWidget component globally
+        app.component('ChatWidget', ChatWidget);
+        
+        app.mount(el);
     },
     progress: {
         color: '#4B5563',

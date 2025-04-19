@@ -25,7 +25,7 @@ class Tenant extends Model
         'address',
         'phone',
         'email',
-        'logo_url',
+        'logo_path',
         'school_type',
         'status',
         'subscription_plan',
@@ -65,8 +65,20 @@ class Tenant extends Model
         // static::created(function ($tenant) {
         //     static::logActivity('create', 'Tenant Created', "New tenant '{$tenant->name}' was created");
         // });
+
+        static::created(function ($tenant) {
+            $tenant->usage()->create([
+                'storage_used' => 0,
+                'file_count' => 0
+            ]);
+        });
     }
 
+    public function getFormattedAddressAttribute() 
+    {
+        return nl2br(e($this->address));
+    }
+    
     public static function current()
     {
         $subdomain = explode('.', request()->getHost())[0];
@@ -128,7 +140,7 @@ class Tenant extends Model
 
     public function admin()
     {
-        return $this->hasOne(User::class, 'tenant_id')->where('role', 'tenant-admin');
+        return $this->belongsTo(User::class, 'admin_id')->where('role', User::ROLE_TENANT_ADMIN);
     }
 
     public function classes()
@@ -137,9 +149,20 @@ class Tenant extends Model
     }
 
     // Get logo URL or default
-    public function getLogoUrlAttribute($value)
+    public function getLogoUrlAttribute()
     {
-        return $value ?? '/images/default-school-logo.png';
+        if ($this->logo_path) {
+            // Sanitize the path by removing quotes and invalid characters
+            $cleanPath = trim($this->logo_path, "\"'");
+            \Log::channel('tenant')->debug('Sanitized logo path', [
+                'original' => $this->logo_path,
+                'clean' => $cleanPath
+            ]);
+            
+            return Storage::disk('tenant')->url($cleanPath);
+        }
+        
+        return '/images/default-school-logo.png';
     }
 
     public function subscription()
@@ -290,5 +313,45 @@ class Tenant extends Model
     {
         static::$currentModel = new static;
         static::$currentModel->created_by_user_id = $userId;
+    }
+
+    public function attendances()
+    {
+        return $this->hasMany(Attendance::class);
+    }
+
+    protected function logoPath(): Attribute
+    {
+        return Attribute::make(
+            set: function ($value) {
+                if ($value instanceof \Illuminate\Http\UploadedFile) {
+                    $path = $value->store('logos', 'tenant');
+                    
+                    // Remove any quotes from the path
+                    $path = trim($path, "\"'");
+                    
+                    \Log::channel('tenant')->debug('Stored logo path', [
+                        'final_path' => $path
+                    ]);
+                    
+                    return $path;
+                }
+                
+                return $value;
+            }
+        );
+    }
+
+    public function usage()
+    {
+        return $this->hasOne(TenantUsage::class);
+    }
+
+    public function pastSubscriptions()
+    {
+        return $this->hasMany(Subscription::class)
+            ->where('status', 'expired')
+            ->orWhere('status', 'canceled')
+            ->orderBy('ends_at', 'desc');
     }
 }

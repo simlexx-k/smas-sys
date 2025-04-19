@@ -102,81 +102,107 @@ class LandlordTenantController extends Controller
 
     public function show(Tenant $tenant)
     {
-        \Log::info('Loading tenant data', ['tenant_id' => $tenant->id]);
+        try {
+            // Start logging
+            \Log::channel('billing')->info('🏫 Loading SchoolDetails for tenant', [
+                'tenant_id' => $tenant->id,
+                'path' => request()->path(),
+                'method' => request()->method()
+            ]);
 
-        // First get the active subscription
-        $activeSubscription = $tenant->subscriptions()
-            ->where('status', 'active')
-            ->with(['plan', 'invoices'])
-            ->first();
+            // Eager load relationships with logging
+            \Log::channel('billing')->debug('🔗 Loading relationships', [
+                'relationships' => ['subscription', 'admin', 'usage', 'domains']
+            ]);
+            
+            $tenant->load([
+                'subscription' => function($query) {
+                    $query->with([
+                        'plan',
+                        'invoices' => function($q) {
+                            $q->orderBy('billing_period_end', 'desc')
+                              ->with(['subscription.plan']);
+                        }
+                    ]);
+                },
+                'admin',
+                'usage',
+                'domains',
+                'pastSubscriptions' => function($query) {
+                    $query->with(['invoices', 'plan'])
+                          ->orderBy('ends_at', 'desc');
+                }
+            ]);
 
-        $tenant->load([
-            'subscriptions' => function ($query) use ($activeSubscription) {
-                $query->with(['plan', 'invoices'])
-                      ->where('status', '!=', 'active')
-                      ->when($activeSubscription, function ($q) use ($activeSubscription) {
-                          $q->where('id', '!=', $activeSubscription->id);
-                      })
-                      ->orderBy('ends_at', 'desc');
-            },
-        ]);
+            // Log relationship status
+            \Log::channel('billing')->info('✅ Relationships loaded', [
+                'has_subscription' => $tenant->subscription ? true : false,
+                'subscription_invoices' => $tenant->subscription?->invoices?->count() ?? 0,
+                'past_subscriptions' => $tenant->pastSubscriptions->count(),
+                'domains_count' => $tenant->domains->count()
+            ]);
 
-        // Transform the data for the frontend
-        $tenantData = [
-            'id' => $tenant->id,
-            'name' => $tenant->name,
-            'email' => $tenant->email,
-            'logo_url' => $tenant->logo_url,
-            'created_at' => $tenant->created_at,
-            'is_active' => $tenant->status === 'active',
-            'status' => $tenant->status,
-            'school_type' => $tenant->school_type,
-            'subscription' => $activeSubscription ? [
-                'id' => $activeSubscription->id,
-                'status' => $activeSubscription->status,
-                'starts_at' => $activeSubscription->starts_at,
-                'ends_at' => $activeSubscription->ends_at,
-                'trial_ends_at' => $activeSubscription->trial_ends_at,
-                'price' => $activeSubscription->price,
-                'features' => $activeSubscription->features,
-                'payment_method' => $activeSubscription->payment_method,
-                'last_payment_at' => $activeSubscription->last_payment_at,
-                'next_payment_at' => $activeSubscription->next_payment_at,
-                'plan' => $activeSubscription->plan ? [
-                    'name' => $activeSubscription->plan->name,
-                    'slug' => $activeSubscription->plan->slug,
-                ] : null,
-                'invoices' => $activeSubscription->invoices ?? []
-            ] : null,
-            'past_subscriptions' => $tenant->subscriptions
-                ->map(function ($subscription) {
-                    return [
-                        'id' => $subscription->id,
-                        'status' => $subscription->status,
-                        'starts_at' => $subscription->starts_at,
-                        'ends_at' => $subscription->ends_at,
-                        'plan' => $subscription->plan ? [
-                            'name' => $subscription->plan->name,
-                            'slug' => $subscription->plan->slug,
-                        ] : null,
-                        'invoices' => $subscription->invoices ?? []
-                    ];
-                })->toArray()
-        ];
+            // Deep subscription logging
+            if ($tenant->subscription) {
+                \Log::channel('billing')->debug('🔍 Subscription details', [
+                    'subscription_id' => $tenant->subscription->id,
+                    'status' => $tenant->subscription->status,
+                    'plan' => $tenant->subscription->plan?->only('id', 'name', 'price'),
+                    'invoices' => $tenant->subscription->invoices->map(function($invoice) {
+                        return [
+                            'id' => $invoice->id,
+                            'number' => $invoice->number,
+                            'status' => $invoice->status,
+                            'amount' => $invoice->amount,
+                            'file_path' => $invoice->file_path ?? 'null',
+                            'file_exists' => $invoice->file_path 
+                                ? \Storage::exists($invoice->file_path)
+                                : false
+                        ];
+                    })
+                ]);
+            }
 
-        \Log::info('Transformed tenant data', [
-            'has_subscription_data' => isset($tenantData['subscription']),
-            'past_subscriptions_count' => count($tenantData['past_subscriptions']),
-            'data' => $tenantData
-        ]);
+            // Add file existence check
+            if ($tenant->subscription) {
+                $tenant->subscription->invoices->each(function($invoice) {
+                    // Handle null file_path and empty strings
+                    $invoice->file_exists = $invoice->file_path 
+                        ? Storage::disk('invoices')->exists($invoice->file_path)
+                        : false;
+                });
+            }
 
-        return Inertia::render('Admin/Tenants/Show', [
-            'tenant' => $tenantData,
-            'stats' => [
-                'usage' => $this->tenantService->getUsageStats($tenant),
-                'tenant' => $this->tenantService->getTenantStats($tenant)
-            ]
-        ]);
+            return Inertia::render('Admin/Tenants/Show', [
+                'tenant' => array_merge($tenant->toArray(), [
+                    'subscription' => $tenant->subscription 
+                        ? $tenant->subscription->loadMissing('plan')
+                        : null,
+                    'admin' => $tenant->admin
+                ]),
+                'stats' => [
+                    'usage' => [
+                        'storage_used' => ($tenant->usage?->storage_used ?? 0).' MB',
+                        'file_count' => $tenant->usage?->file_count ?? 0,
+                        'last_activity' => $tenant->usage?->updated_at?->diffForHumans() ?? 'N/A'
+                    ],
+                    'tenant' => [
+                        'user_count' => $tenant->users_count,
+                        'subscription_status' => $tenant->subscription?->status,
+                        'subscription_ends' => $tenant->subscription?->ends_at?->format('Y-m-d'),
+                        'plan_id' => $tenant->subscription?->plan_id
+                    ]
+                ]
+            ]);
+
+        } catch (\Exception $e) {
+            \Log::channel('billing')->error('💥 SchoolDetails load failed', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+                'tenant_id' => $tenant->id
+            ]);
+            throw $e;
+        }
     }
 
     public function store(Request $request)
@@ -267,7 +293,7 @@ class LandlordTenantController extends Controller
                 'error' => $e->getMessage(),
                 'trace' => $e->getTraceAsString()
             ]);
-            return back()->withErrors(['error' => 'Failed to create school: ' . $e->getMessage()]);
+            return back()->with('error', 'Error creating school: ' . $e->getMessage());
         }
     }
 

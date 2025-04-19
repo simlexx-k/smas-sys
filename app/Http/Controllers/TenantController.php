@@ -13,6 +13,7 @@ use Inertia\Inertia;
 use App\Traits\TenantBindable;
 use App\Models\Lesson;
 use App\Models\Activity;
+use Illuminate\Support\Facades\Storage;
 
 class TenantController extends Controller
 {
@@ -97,17 +98,52 @@ class TenantController extends Controller
         return response()->json($tenant);
     }
 
-    public function show($hashedId)
+    public function show(Tenant $tenant)
     {
-        \Log::info("Hashed ID received: " . $hashedId);
-        $id = Tenant::decodeHashedId($hashedId);
-        $tenant = Tenant::find($id);
+        try {
+            \Log::channel('billing')->info('STARTED loading tenant subscription', [
+                'tenant_id' => $tenant->id,
+                'time' => now()->toDateTimeString()
+            ]);
 
-        if (!$tenant) {
-            return response()->json(['error' => 'Tenant not found'], 404);
+            $tenant->load([
+                'subscription.invoices',
+                'subscription.plan',
+                'pastSubscriptions.invoices',
+                'pastSubscriptions.plan'
+            ]);
+
+            \Log::channel('billing')->debug('Relationships loaded', [
+                'subscription_loaded' => $tenant->relationLoaded('subscription'),
+                'pastSubscriptions_loaded' => $tenant->relationLoaded('pastSubscriptions'),
+                'subscription_invoices_count' => $tenant->subscription?->invoices?->count() ?? 0,
+                'past_subscriptions_count' => $tenant->pastSubscriptions->count()
+            ]);
+
+            if ($tenant->subscription) {
+                \Log::channel('billing')->info('Active subscription found', [
+                    'subscription_id' => $tenant->subscription->id,
+                    'status' => $tenant->subscription->status,
+                    'plan_id' => $tenant->subscription->plan_id,
+                    'invoices_count' => $tenant->subscription->invoices->count()
+                ]);
+            } else {
+                \Log::channel('billing')->warning('No active subscription found', [
+                    'tenant_id' => $tenant->id
+                ]);
+            }
+
+            return Inertia::render('Tenant/Show', [
+                'tenant' => $tenant->append(['subscription_plan', 'logo_url']),
+            ]);
+
+        } catch (\Exception $e) {
+            \Log::channel('billing')->error('Failed to load tenant subscription', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+            throw $e;
         }
-
-        return response()->json(['tenant' => $tenant, 'hashed_id' => $tenant->hashed_id]);
     }
 
     public function destroy($hashedId)

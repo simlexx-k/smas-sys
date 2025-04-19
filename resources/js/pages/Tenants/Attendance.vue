@@ -85,7 +85,7 @@
               </tr>
             </thead>
             <tbody class="bg-white divide-y divide-gray-200">
-              <tr v-for="record in filteredAttendance" :key="record.id">
+              <tr v-for="record in paginatedRecords" :key="record.id">
                 <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                   {{ formatDate(record.date) }}
                 </td>
@@ -112,18 +112,25 @@
                   </span>
                 </td>
                 <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                  <button
-                    class="text-indigo-600 hover:text-indigo-900 mr-4"
-                    @click="viewDetails(record)"
-                  >
-                    Edit
-                  </button>
-                  <button
-                    class="text-red-600 hover:text-red-900"
-                    @click="deleteRecord(record)"
-                  >
-                    Delete
-                  </button>
+                  <div class="flex items-center space-x-4">
+                    <button
+                      class="text-indigo-600 hover:text-indigo-900"
+                      @click="openEditModal(record)"
+                    >
+                      <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/>
+                      </svg>
+                    </button>
+                    
+                    <button
+                      class="text-red-600 hover:text-red-900"
+                      @click="openDeleteModal(record)"
+                    >
+                      <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+                      </svg>
+                    </button>
+                  </div>
                 </td>
               </tr>
             </tbody>
@@ -131,14 +138,14 @@
         </div>
   
         <!-- Empty State -->
-        <div v-if="filteredAttendance.length === 0" class="mt-8 text-center text-gray-500">
+        <div v-if="paginatedRecords.length === 0" class="mt-8 text-center text-gray-500">
           No attendance records found for selected filters
         </div>
   
         <!-- Pagination -->
         <div v-else class="mt-8 flex justify-between items-center">
           <span class="text-sm text-gray-700">
-            Showing {{ paginationStart }} to {{ paginationEnd }} of {{ filteredAttendance.length }} records
+            Showing {{ paginationStart }} to {{ paginationEnd }} of {{ paginatedRecords.length }} records
           </span>
           <nav class="relative z-0 inline-flex rounded-md shadow-sm">
             <button
@@ -187,16 +194,26 @@
                         </div>
                         <div class="mb-4">
                           <label class="block text-sm font-medium text-gray-700" for="classId">Class</label>
+                          <div v-if="loading.classes" class="text-gray-500 text-sm">
+                            Loading classes...
+                          </div>
                           <select
                             id="classId"
                             class="block w-full px-4 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500"
                             v-model="newAttendance.classId"
+                            :disabled="loading.classes"
                           >
-                            <option v-for="classItem in safeClasses" :key="classItem.id" :value="classItem.id">{{ classItem.name }}</option>
+                            <option value="" disabled>Select a class</option>
+                            <option v-for="classItem in safeClasses" :key="classItem.id" :value="classItem.id">
+                              {{ classItem.name }}
+                            </option>
                           </select>
                         </div>
                         <div class="mb-4">
                           <label class="block text-sm font-medium text-gray-700" for="studentId">Student</label>
+                          <div v-if="loading.students" class="text-gray-500 text-sm">
+                            Loading students...
+                          </div>
                           <select
                             id="studentId"
                             class="block w-full px-4 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500"
@@ -339,13 +356,156 @@
           </table>
         </div>
       </div>
+
+      <!-- Edit Modal -->
+      <div v-if="showEditModal" class="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity">
+        <div class="fixed inset-0 z-10 overflow-y-auto">
+          <div class="flex min-h-full items-end justify-center p-4 text-center sm:items-center sm:p-0">
+            <div class="relative transform overflow-hidden rounded-lg bg-white text-left shadow-xl transition-all sm:my-8 sm:w-full sm:max-w-lg">
+              <div class="bg-white px-4 pb-4 pt-5 sm:p-6 sm:pb-4">
+                <h3 class="text-lg font-semibold leading-6 text-gray-900">Edit Attendance Record</h3>
+                <form @submit.prevent="submitEdit" class="mt-4 space-y-4">
+                  <div>
+                    <label class="block text-sm font-medium text-gray-700">Date</label>
+                    <input
+                      type="date"
+                      class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+                      v-model="selectedRecord.date"
+                      required
+                    />
+                  </div>
+
+                  <div>
+                    <label class="block text-sm font-medium text-gray-700">Class</label>
+                    <select
+                      class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+                      v-model="selectedRecord.classId"
+                      required
+                      @change="selectedRecord.studentId = ''"
+                    >
+                      <option value="" disabled>Select a class</option>
+                      <option v-for="classItem in safeClasses" :key="classItem.id" :value="classItem.id">
+                        {{ classItem.name }}
+                      </option>
+                    </select>
+                  </div>
+
+                  <div class="mb-4">
+                    <label class="block text-sm font-medium text-gray-700">Student</label>
+                    <div v-if="loading.students" class="text-gray-500 text-sm mt-1">
+                      Loading students...
+                    </div>
+                    <select
+                      v-else
+                      id="studentId"
+                      class="block w-full px-4 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500"
+                      v-model="selectedRecord.studentId"
+                      :disabled="loading.students"
+                      required
+                    >
+                      <option value="" disabled>Select a student</option>
+                      <option 
+                        v-for="student in students.filter(s => s.school_class_id == selectedRecord.classId)" 
+                        :key="student.id" 
+                        :value="student.id"
+                      >
+                        {{ student.first_name }} {{ student.last_name }}
+                      </option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label class="block text-sm font-medium text-gray-700">Status</label>
+                    <select
+                      class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+                      v-model="selectedRecord.status"
+                      required
+                    >
+                      <option value="present">Present</option>
+                      <option value="absent">Absent</option>
+                      <option value="late">Late</option>
+                    </select>
+                  </div>
+
+                  <div class="bg-gray-50 px-4 py-3 sm:flex sm:flex-row-reverse sm:px-6">
+                    <button
+                      type="submit"
+                      class="inline-flex w-full justify-center rounded-md bg-indigo-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-indigo-500 sm:ml-3 sm:w-auto"
+                      :disabled="isProcessing"
+                    >
+                      <span v-if="!isProcessing">Save Changes</span>
+                      <span v-else>Saving...</span>
+                    </button>
+                    <button
+                      type="button"
+                      class="mt-3 inline-flex w-full justify-center rounded-md bg-white px-3 py-2 text-sm font-semibold text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50 sm:mt-0 sm:w-auto"
+                      @click="showEditModal = false"
+                      :disabled="isProcessing"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </form>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Delete Confirmation Modal -->
+      <div v-if="showDeleteModal" class="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity">
+        <div class="fixed inset-0 z-10 overflow-y-auto">
+          <div class="flex min-h-full items-end justify-center p-4 text-center sm:items-center sm:p-0">
+            <div class="relative transform overflow-hidden rounded-lg bg-white text-left shadow-xl transition-all sm:my-8 sm:w-full sm:max-w-lg">
+              <div class="bg-white px-4 pb-4 pt-5 sm:p-6 sm:pb-4">
+                <div class="sm:flex sm:items-start">
+                  <div class="mx-auto flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-full bg-red-100 sm:mx-0 sm:h-10 sm:w-10">
+                    <svg class="h-6 w-6 text-red-600" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                      <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" />
+                    </svg>
+                  </div>
+                  <div class="mt-3 text-center sm:ml-4 sm:mt-0 sm:text-left">
+                    <h3 class="text-base font-semibold leading-6 text-gray-900">Delete attendance record</h3>
+                    <div class="mt-2">
+                      <p class="text-sm text-gray-500">
+                        Are you sure you want to delete the attendance record for 
+                        <span class="font-medium">{{ selectedRecord?.student?.first_name }} {{ selectedRecord?.student?.last_name }}</span>
+                        on {{ formatDate(selectedRecord?.date) }}?
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div class="bg-gray-50 px-4 py-3 sm:flex sm:flex-row-reverse sm:px-6">
+                <button
+                  type="button"
+                  class="inline-flex w-full justify-center rounded-md bg-red-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-red-500 sm:ml-3 sm:w-auto"
+                  @click="confirmDelete"
+                  :disabled="isProcessing"
+                >
+                  <span v-if="!isProcessing">Delete</span>
+                  <span v-else>Deleting...</span>
+                </button>
+                <button
+                  type="button"
+                  class="mt-3 inline-flex w-full justify-center rounded-md bg-white px-3 py-2 text-sm font-semibold text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50 sm:mt-0 sm:w-auto"
+                  @click="showDeleteModal = false"
+                  :disabled="isProcessing"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
     </AppLayout>
 </template>
   
   <script setup lang="ts">
   import AppLayout from '@/layouts/AppLayout.vue';
   import { Head } from '@inertiajs/vue3';
-  import { ref, computed, onMounted } from 'vue';
+  import { ref, computed, onMounted, watch, nextTick } from 'vue';
   import { type BreadcrumbItem } from '@/types';
   import axios from 'axios';
   // import { toast } from '@/plugins/toast';
@@ -377,42 +537,52 @@
   
   const fetchClasses = async () => {
     try {
+      loading.value.classes = true;
       const response = await axios.get('/api/classes');
       classes.value = response.data?.data || [];
-    } catch (error) {
-      console.error('Error fetching classes:', error);
+      error.value.classes = null;
+    } catch (err) {
+      console.error('Error fetching classes:', err);
+      error.value.classes = err.response?.data?.message || 'Failed to load classes';
       classes.value = [];
+    } finally {
+      loading.value.classes = false;
     }
   };
   
   const fetchAttendances = async () => {
     try {
-      const response = await axios.get('/api/attendances');
-      attendances.value = response.data?.data || [];
-    } catch (error) {
-      console.error('Error fetching attendances:', error);
+      loading.value.attendances = true;
+      const response = await axios.get('/api/attendances/detailed');
+      console.log('API Response:', response.data);
+      attendances.value = response.data || [];
+    } catch (err) {
+      console.error('Error:', err.response);
+      error.value.attendances = err.response?.data?.message || 'Failed to load';
+      attendances.value = [];
+    } finally {
+      loading.value.attendances = false;
     }
   };
   
   // Fetch students, classes, and tenant on component mount
   onMounted(async () => {
-    console.log('Fetching attendance data...');
     try {
       loading.value = { students: true, classes: true, attendances: true };
-
-      const [studentsResponse, classesResponse, attendancesResponse] = await Promise.all([
+      
+      // Fetch initial data in parallel
+      const [studentsResponse] = await Promise.all([
         axios.get('/api/students'),
         fetchClasses(),
         fetchAttendances()
       ]);
-
-      students.value = studentsResponse.data;
-      console.log('Attendance data fetched successfully');
+      
+      students.value = studentsResponse.data?.data || [];
     } catch (err) {
-      console.error('Error fetching attendance data:', err);
+      console.error('Error fetching initial data:', err);
       error.value = {
         students: err.response?.data?.message || 'Failed to fetch students',
-        classes: err.response?.data?.message || 'Failed to fetch classes',
+        classes: error.value.classes,  // Preserve existing error
         attendances: err.response?.data?.message || 'Failed to fetch attendances'
       };
     } finally {
@@ -436,27 +606,59 @@
   
   // Compute attendance records based on fetched data
   const attendanceRecords = computed(() => {
-    if (!attendances.value || !students.value || !classes.value) return [];
+    return attendances.value.map(attendance => ({
+      id: attendance.id,
+      date: attendance.date,
+      class: attendance.class || null,
+      student: attendance.student || null,
+      status: attendance.status,
+      markedBy: attendance.marked_by || null
+    }));
+  });
+  
+  const filteredRecords = computed(() => {
+    let records = attendanceRecords.value;
 
-    // Validate and process attendance data
-    return attendances.value
-      .filter(attendance => attendance && attendance.student_id && attendance.class_id)
-      .map(attendance => {
-        const student = students.value.find(s => s.id === attendance.student_id);
-        const classItem = classes.value.find(c => c.id === attendance.class_id);
+    if (filters.value.selectedDate) {
+      const selectedDate = new Date(filters.value.selectedDate).toISOString().split('T')[0];
+      records = records.filter(record => record.date === selectedDate);
+    }
 
-        return {
-          ...attendance,
-          student: student || { first_name: 'Unknown', last_name: 'Student' },
-          className: classItem?.name || 'Unknown Class',
-          totalStudents: classItem?.students_count || 0
-        };
-      });
+    if (filters.value.dayOfWeek) {
+      records = records.filter(record => getDayOfWeek(record.date) === filters.value.dayOfWeek);
+    }
+
+    return records;
   });
   
   const filteredAttendance = computed(() => {
-    // Implement filtering logic
-    return attendanceRecords.value;
+    const grouped = filteredRecords.value.reduce((acc, record) => {
+      const dateKey = record.date;
+      if (!acc[dateKey]) {
+        acc[dateKey] = {
+          date: record.date,
+          present: 0,
+          absent: 0,
+          late: 0,
+          totalStudents: 0
+        };
+      }
+      
+      acc[dateKey].totalStudents++;
+      if (record.status === 'present') acc[dateKey].present++;
+      if (record.status === 'absent') acc[dateKey].absent++;
+      if (record.status === 'late') acc[dateKey].late++;
+      
+      return acc;
+    }, {});
+
+    return Object.values(grouped).sort((a, b) => new Date(b.date) - new Date(a.date));
+  });
+  
+  const paginatedRecords = computed(() => {
+    const start = (currentPage.value - 1) * itemsPerPage;
+    const end = start + itemsPerPage;
+    return filteredRecords.value.slice(start, end);
   });
   
   const paginationStart = computed(() => {
@@ -464,11 +666,11 @@
   });
   
   const paginationEnd = computed(() => {
-    return Math.min(currentPage.value * itemsPerPage, filteredAttendance.value.length);
+    return Math.min(currentPage.value * itemsPerPage, filteredRecords.value.length);
   });
   
   const totalPages = computed(() => {
-    return Math.ceil(filteredAttendance.value.length / itemsPerPage);
+    return Math.ceil(filteredRecords.value.length / itemsPerPage);
   });
   
   const previousPage = () => {
@@ -502,10 +704,16 @@
   const openNewAttendance = () => {
     console.log('Opening new attendance form');
     showAttendanceForm.value = true;
+    // Reset form when opening
+    newAttendance.value = {
+      date: new Date().toISOString().split('T')[0],  // Set default to today
+      classId: safeClasses.value[0]?.id || '',
+      studentId: students.value[0]?.id || '',
+      status: 'present'
+    };
   };
   
   const submitAttendance = async () => {
-    console.log('Submitting attendance data...');
     try {
       const response = await axios.post('/api/attendances', {
         tenant_id: tenant.value.id,
@@ -516,26 +724,76 @@
       });
 
       if (response.status === 201) {
-        console.log('Attendance submitted successfully');
+        await fetchAttendances(); // Refresh the list
         showAttendanceForm.value = false;
-        newAttendance.value = {
-          date: '',
-          classId: '',
-          studentId: '',
-          status: 'present'
-        };
       }
     } catch (error) {
       console.error('Error submitting attendance:', error);
     }
   };
   
-  const viewDetails = (record) => {
-    // Implement logic to view attendance details
+  const showEditModal = ref(false);
+  const showDeleteModal = ref(false);
+  const selectedRecord = ref(null);
+  const isProcessing = ref(false);
+  
+  const openEditModal = async (record) => {
+    selectedRecord.value = {
+      ...record,
+      classId: record.class?.id || record.class_id // Handle both formats
+    };
+    
+    if (!students.value.length) {
+      await fetchStudents();
+    }
+    
+    // Force Vue to recognize the studentId change
+    nextTick(() => {
+      showEditModal.value = true;
+    });
   };
   
-  const deleteRecord = (record) => {
-    // Implement logic to delete attendance record
+  const submitEdit = async () => {
+    try {
+      isProcessing.value = true;
+      const response = await axios.put(`/api/attendances/${selectedRecord.value.id}`, {
+        date: selectedRecord.value.date,
+        class_id: selectedRecord.value.classId,
+        student_id: selectedRecord.value.studentId,
+        status: selectedRecord.value.status
+      });
+
+      // Update local state
+      const index = attendances.value.findIndex(a => a.id === selectedRecord.value.id);
+      attendances.value[index] = response.data;
+      showToast('Attendance updated successfully');
+      showEditModal.value = false;
+    } catch (err) {
+      console.error('Update failed:', err);
+      showToast('Failed to update record', 'error');
+    } finally {
+      isProcessing.value = false;
+    }
+  };
+  
+  const openDeleteModal = (record) => {
+    selectedRecord.value = record;
+    showDeleteModal.value = true;
+  };
+  
+  const confirmDelete = async () => {
+    try {
+      isProcessing.value = true;
+      await axios.delete(`/api/attendances/${selectedRecord.value.id}`);
+      attendances.value = attendances.value.filter(a => a.id !== selectedRecord.value.id);
+      showToast('Attendance record deleted');
+      showDeleteModal.value = false;
+    } catch (err) {
+      console.error('Delete failed:', err);
+      showToast('Failed to delete record', 'error');
+    } finally {
+      isProcessing.value = false;
+    }
   };
   
   const clearFilters = () => {
@@ -554,6 +812,47 @@
   const getDayOfWeek = (date) => {
     const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
     return days[new Date(date).getDay()];
+  };
+  
+  // Add a watcher for class selection
+  watch(() => newAttendance.value.classId, async (newClassId) => {
+    if (newClassId) {
+      try {
+        loading.value.students = true;
+        const response = await axios.get(`/api/classes/${newClassId}/students`);
+        students.value = response.data?.data || [];
+        if (students.value.length > 0) {
+          newAttendance.value.studentId = students.value[0].id;
+        }
+      } catch (err) {
+        console.error('Error fetching class students:', err);
+        students.value = [];
+      } finally {
+        loading.value.students = false;
+      }
+    }
+  });
+
+  const fetchStudents = async () => {
+    try {
+      loading.value.students = true;
+      const response = await axios.get('/api/students');
+      console.log('Students API Response:', response.data);
+      
+      // API returns { data: [...] } structure
+      students.value = response.data.data || []; // Keep .data.data
+      
+      // Map students to include both class_id and school_class_id
+      students.value = students.value.map(s => ({
+        ...s,
+        class_id: s.school_class_id // Add alias for compatibility
+      }));
+    } catch (err) {
+      console.error('Error fetching students:', err);
+      error.value.students = err.response?.data?.message || 'Failed to load students';
+    } finally {
+      loading.value.students = false;
+    }
   };
   </script>
   

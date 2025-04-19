@@ -127,6 +127,18 @@ return [
             'path' => storage_path('logs/laravel.log'),
         ],
 
+        'tenant' => [
+            'driver' => 'single',
+            'path' => storage_path('logs/tenant.log'),
+            'level' => 'debug',
+        ],
+
+        'billing' => [
+            'driver' => 'single',
+            'path' => storage_path('logs/billing.log'),
+            'level' => env('LOG_LEVEL', 'debug'),
+        ],
+
     ],
 
 ];

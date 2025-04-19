@@ -13,9 +13,9 @@ interface Plan {
 interface Subscription {
     id: number;
     tenant: {
-        id: number;
-        name: string;
-    };
+        id?: number;
+        name?: string;
+    } | null;
     plan: Plan | null;
     plan_id: number | null;
     status: string;
@@ -96,100 +96,101 @@ const breadcrumbs: BreadcrumbItem[] = [
             <div class="max-w-7xl mx-auto sm:px-6 lg:px-8">
                 <div class="bg-white overflow-hidden shadow-sm sm:rounded-lg">
                     <div class="p-6 bg-white border-b border-gray-200">
-                        <div v-if="!subscriptions.data.length" class="text-center py-12">
-                            <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                            </svg>
-                            <h3 class="mt-2 text-sm font-medium text-gray-900">No subscriptions</h3>
-                            <p class="mt-1 text-sm text-gray-500">Get started by creating a new subscription.</p>
-                            <div class="mt-6">
-                                <Link
-                                    :href="route('admin.subscriptions.create')"
-                                    class="inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700"
-                                >
-                                    <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
-                                    </svg>
-                                    New Subscription
-                                </Link>
-                            </div>
+                        <div v-if="subscriptions.data.length === 0">
+                            No subscriptions found
                         </div>
 
-                        <div v-else class="overflow-x-auto">
-                            <table class="min-w-full divide-y divide-gray-200">
-                                <thead class="bg-gray-50">
-                                    <tr>
-                                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                            School
-                                        </th>
-                                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                            Plan
-                                        </th>
-                                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                            Status
-                                        </th>
-                                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                            Price
-                                        </th>
-                                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                            Start Date
-                                        </th>
-                                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                            End Date
-                                        </th>
-                                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                            Actions
-                                        </th>
-                                    </tr>
-                                </thead>
-                                <tbody class="bg-white divide-y divide-gray-200">
-                                    <tr v-for="subscription in subscriptions.data" :key="subscription.id">
-                                        <td class="px-6 py-4 whitespace-nowrap">
-                                            <Link
-                                                :href="`/admin/tenants/${subscription.tenant.id}`"
-                                                class="text-indigo-600 hover:text-indigo-900"
+                        <template v-else>
+                            <div class="overflow-x-auto">
+                                <table class="min-w-full divide-y divide-gray-200">
+                                    <thead class="bg-gray-50">
+                                        <tr>
+                                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                                School
+                                            </th>
+                                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                                Plan
+                                            </th>
+                                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                                Status
+                                            </th>
+                                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                                Price
+                                            </th>
+                                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                                Start Date
+                                            </th>
+                                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                                End Date
+                                            </th>
+                                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                                Actions
+                                            </th>
+                                        </tr>
+                                    </thead>
+                                    <tbody class="bg-white divide-y divide-gray-200">
+                                        <template v-if="subscriptions.data.filter(s => s).length === 0">
+                                            <tr>
+                                                <td colspan="7" class="text-center py-4 text-gray-500">
+                                                    All subscriptions are invalid or deleted
+                                                </td>
+                                            </tr>
+                                        </template>
+                                        <template v-else>
+                                            <tr 
+                                                v-for="(subscription, index) in subscriptions.data.filter(s => s)" 
+                                                :key="subscription?.id || index"
                                             >
-                                                {{ subscription.tenant.name }}
-                                            </Link>
-                                        </td>
-                                        <td class="px-6 py-4 whitespace-nowrap">
-                                            <span class="capitalize">{{ subscription.plan?.name }}</span>
-                                            <span v-if="!subscription.plan" class="text-xs text-red-500">
-                                                (Plan not found - ID: {{ subscription.plan_id }})
-                                            </span>
-                                        </td>
-                                        <td class="px-6 py-4 whitespace-nowrap">
-                                            <span
-                                                :class="[getStatusColor(subscription.status), 'px-2 py-1 rounded-full text-xs']"
-                                            >
-                                                {{ subscription.status }}
-                                            </span>
-                                        </td>
-                                        <td class="px-6 py-4 whitespace-nowrap">
-                                            {{ formatPrice(subscription.price) }}
-                                        </td>
-                                        <td class="px-6 py-4 whitespace-nowrap">
-                                            {{ formatDate(subscription.starts_at) }}
-                                        </td>
-                                        <td class="px-6 py-4 whitespace-nowrap">
-                                            {{ formatDate(subscription.ends_at) }}
-                                        </td>
-                                        <td class="px-6 py-4 whitespace-nowrap text-sm">
-                                            <Link
-                                                :href="`/admin/subscriptions/${subscription.id}`"
-                                                class="text-indigo-600 hover:text-indigo-900"
-                                            >
-                                                View
-                                            </Link>
-                                        </td>
-                                    </tr>
-                                </tbody>
-                            </table>
-                            
+                                                <td class="px-6 py-4 whitespace-nowrap">
+                                                    <Link
+                                                        v-if="subscription.tenant?.id"
+                                                        :href="`/admin/tenants/${subscription.tenant.id}`"
+                                                        class="text-indigo-600 hover:text-indigo-900"
+                                                    >
+                                                        {{ subscription.tenant?.name || 'N/A' }}
+                                                    </Link>
+                                                    <span v-else class="text-gray-500">N/A</span>
+                                                </td>
+                                                <td class="px-6 py-4 whitespace-nowrap">
+                                                    <span class="capitalize">{{ subscription.plan?.name }}</span>
+                                                    <span v-if="!subscription.plan" class="text-xs text-red-500">
+                                                        (Plan not found - ID: {{ subscription.plan_id }})
+                                                    </span>
+                                                </td>
+                                                <td class="px-6 py-4 whitespace-nowrap">
+                                                    <span
+                                                        :class="[getStatusColor(subscription.status), 'px-2 py-1 rounded-full text-xs']"
+                                                    >
+                                                        {{ subscription.status }}
+                                                    </span>
+                                                </td>
+                                                <td class="px-6 py-4 whitespace-nowrap">
+                                                    {{ formatPrice(subscription.price) }}
+                                                </td>
+                                                <td class="px-6 py-4 whitespace-nowrap">
+                                                    {{ formatDate(subscription.starts_at) }}
+                                                </td>
+                                                <td class="px-6 py-4 whitespace-nowrap">
+                                                    {{ formatDate(subscription.ends_at) }}
+                                                </td>
+                                                <td class="px-6 py-4 whitespace-nowrap text-sm">
+                                                    <Link
+                                                        :href="`/admin/subscriptions/${subscription.id}`"
+                                                        class="text-indigo-600 hover:text-indigo-900"
+                                                    >
+                                                        View
+                                                    </Link>
+                                                </td>
+                                            </tr>
+                                        </template>
+                                    </tbody>
+                                </table>
+                            </div>
+
                             <div v-if="subscriptions.links?.length > 2" class="mt-6">
                                 <Pagination :links="subscriptions.links" />
                             </div>
-                        </div>
+                        </template>
                     </div>
                 </div>
             </div>

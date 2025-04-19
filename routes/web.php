@@ -17,6 +17,8 @@ use App\Http\Controllers\TeacherController;
 use App\Http\Controllers\Teacher\ExamResultsController;
 use App\Http\Controllers\Teacher\ReportController;
 use App\Http\Controllers\Auth\SchoolRegistrationController;
+use App\Http\Controllers\ChatController;
+use App\Models\Plan;
 
 // Public routes
 Route::get('/', function () {
@@ -111,6 +113,19 @@ Route::middleware(['auth', 'verified'])->group(function () {
         // Invoice routes
         Route::get('invoices/{invoice}/download', [InvoiceController::class, 'download'])
             ->name('invoices.download');
+
+        // Add this before the resource route to handle edit view
+        Route::get('admin/subscriptions/{subscription}/edit', [\App\Http\Controllers\Admin\SubscriptionController::class, 'edit'])
+            ->name('admin.subscriptions.edit');
+
+        // Keep your existing resource route with exceptions
+        Route::resource('admin/subscriptions', \App\Http\Controllers\Admin\SubscriptionController::class)
+            ->except(['create', 'show', 'destroy']);
+
+        // Correct invoice generation route
+        Route::post('tenants/{tenant}/invoices/{invoice}/generate-pdf', 
+            [InvoiceController::class, 'generatePdf'])
+            ->name('admin.tenants.invoices.generate-pdf');
     });
 
     // Tenant admin routes
@@ -177,6 +192,11 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::post('/reports/attendance', [ReportController::class, 'generateAttendanceReport'])->name('reports.attendance');
         Route::get('/reports/download-pdf', [ReportController::class, 'downloadPDF'])->name('reports.download-pdf');
     });
+
+    Route::middleware(['auth'])->group(function () {
+        Route::post('/chat', [ChatController::class, 'store'])->name('chat.store');
+        Route::get('/chat/history', [ChatController::class, 'history'])->name('chat.history');
+    });
 });
 
 // API routes
@@ -189,6 +209,14 @@ Route::middleware(['auth', 'verified', 'role:teacher'])->group(function () {
     Route::get('/teacher/exam-results/get', [ExamResultsController::class, 'getResults'])->name('teacher.exam-results.get');
     Route::post('/teacher/exam-results', [ExamResultsController::class, 'store'])->name('teacher.exam-results.store');
 });
+
+Route::get('/admin/plans/active', function () {
+    return response()->json(
+        Plan::where('is_active', true)
+            ->orderBy('sort_order')
+            ->get()
+    );
+})->name('admin.plans.active');
 
 require __DIR__.'/settings.php';
 require __DIR__.'/auth.php';

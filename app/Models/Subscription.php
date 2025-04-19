@@ -39,6 +39,34 @@ class Subscription extends Model
     const STATUS_CANCELED = 'canceled';
     const STATUS_TRIAL = 'trial';
 
+    protected static function booted()
+    {
+        static::created(function ($subscription) {
+            if ($subscription->status === 'active') {
+                app(InvoiceController::class)->generateForSubscription($subscription);
+            }
+        });
+
+        static::updated(function ($subscription) {
+            // Only generate if relevant fields change
+            if ($subscription->isDirty(['starts_at', 'ends_at', 'price', 'status', 'plan_id'])) {
+                // Regenerate invoices only if still active
+                if ($subscription->status === 'active') {
+                    // Delete existing invoices for the changed period
+                    $subscription->invoices()
+                        ->whereBetween('billing_period_end', [
+                            $subscription->getOriginal('starts_at'),
+                            $subscription->getOriginal('ends_at')
+                        ])
+                        ->delete();
+
+                    // Generate new invoices
+                    app(InvoiceController::class)->generateForSubscription($subscription);
+                }
+            }
+        });
+    }
+
     public function renew($duration = 30)
     {
         $now = now();
@@ -131,7 +159,7 @@ class Subscription extends Model
     public function isActive(): bool
     {
         return $this->status === self::STATUS_ACTIVE && 
-            (!$this->ends_at || $this->ends_at->isFuture());
+            ($this->ends_at === null || $this->ends_at->isFuture());
     }
 
     public function isTrialing(): bool
@@ -170,5 +198,28 @@ class Subscription extends Model
     public function invoices()
     {
         return $this->hasMany(Invoice::class);
+    }
+
+    public function getBillingPeriods(): array
+    {
+        $periods = [];
+        $current = $this->starts_at->copy();
+        
+        while ($current < $this->ends_at) {
+            $periodEnd = $current->copy()->addMonth();
+            if ($periodEnd > $this->ends_at) {
+                $periodEnd = $this->ends_at;
+            }
+            
+            $periods[] = [
+                'start' => $current,
+                'end' => $periodEnd,
+                'due_date' => $current->addDays(7)
+            ];
+            
+            $current = $periodEnd;
+        }
+        
+        return $periods;
     }
 } 

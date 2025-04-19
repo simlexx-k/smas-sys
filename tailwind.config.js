@@ -14,7 +14,9 @@ export default {
     theme: {
         extend: {
             fontFamily: {
-                sans: ['Instrument Sans', ...defaultTheme.fontFamily.sans],
+                sans: ['Ubuntu', ...defaultTheme.fontFamily.sans],
+                mono: ['JetBrains Mono', ...defaultTheme.fontFamily.mono],
+                display: ['Poppins', ...defaultTheme.fontFamily.sans],
             },
             borderRadius: {
                 lg: 'var(--radius)',
@@ -73,6 +75,12 @@ export default {
                     ring: 'hsl(var(--sidebar-ring))',
                 },
             },
+            spacing: {
+                '128': '32rem',
+            },
+            maxWidth: {
+                '8xl': '90rem',
+            }
         },
     },
     plugins: [forms],

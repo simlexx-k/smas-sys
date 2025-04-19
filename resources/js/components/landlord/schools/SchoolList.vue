@@ -151,20 +151,18 @@ const getInitials = (name: string): string => {
                             <td class="px-6 py-4 whitespace-nowrap">
                                 <div class="flex items-center">
                                     <div class="flex-shrink-0 h-10 w-10">
-                                        <img
-                                            v-if="school.logo_url && school.logo_url !== '/images/default-school-logo.png'"
-                                            :src="school.logo_url"
+                                        <img 
+                                            v-if="school.logo_url"
+                                            :src="school.logo_url" 
+                                            class="h-10 w-10 rounded-full"
                                             :alt="school.name"
-                                            class="h-10 w-10 rounded-full object-cover"
                                         >
-                                        <div 
-                                            v-else 
-                                            class="h-10 w-10 rounded-full bg-indigo-100 flex items-center justify-center"
+                                        <span 
+                                            v-else
+                                            class="inline-block h-10 w-10 rounded-full bg-gray-100 text-gray-500 flex items-center justify-center"
                                         >
-                                            <span class="text-sm font-medium text-indigo-700">
-                                                {{ getInitials(school.name) }}
-                                            </span>
-                                        </div>
+                                            {{ getInitials(school.name) }}
+                                        </span>
                                     </div>
                                     <div class="ml-4">
                                         <div class="text-sm font-medium text-gray-900">

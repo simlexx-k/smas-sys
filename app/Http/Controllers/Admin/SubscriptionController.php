@@ -122,17 +122,14 @@ class SubscriptionController extends Controller
 
     public function show(Subscription $subscription)
     {
-        Log::info('Viewing subscription details', [
+        $subscription->load(['tenant', 'plan', 'invoices']);
+        
+        Log::info('Displaying subscription', [
             'subscription_id' => $subscription->id,
-            'subscription_data' => $subscription->toArray()
-        ]);
-
-        $subscription->load(['tenant', 'plan']);
-
-        Log::info('Loaded subscription relationships', [
-            'has_tenant' => $subscription->tenant !== null,
-            'has_plan' => $subscription->plan !== null,
-            'plan_data' => $subscription->plan?->toArray()
+            'invoice_count' => $subscription->invoices->count(),
+            'sample_invoice' => $subscription->invoices->first()?->toArray(),
+            'plan_id' => $subscription->plan_id,
+            'tenant_id' => $subscription->tenant_id
         ]);
 
         return Inertia::render('Admin/Subscriptions/Show', [
@@ -141,6 +138,35 @@ class SubscriptionController extends Controller
                 ->orderBy('sort_order')
                 ->get()
         ]);
+    }
+
+    public function edit(Subscription $subscription)
+    {
+        return inertia('Admin/Subscriptions/Edit', [
+            'subscription' => $subscription->load(['tenant', 'plan']),
+            'plans' => Plan::active()->get(),
+            'features' => config('plans.features')
+        ]);
+    }
+
+    public function update(Request $request, Subscription $subscription)
+    {
+        $validated = $request->validate([
+            'plan_id' => 'required|exists:plans,id',
+            'price' => 'required|numeric|min:0',
+            'ends_at' => 'required|date|after:today',
+            'status' => 'required|in:active,canceled'
+        ]);
+
+        try {
+            $subscription->update($validated);
+            
+            return redirect()->route('admin.subscriptions.index')
+                ->with('success', 'Subscription updated successfully');
+            
+        } catch (\Exception $e) {
+            return back()->with('error', 'Update failed: '.$e->getMessage());
+        }
     }
 
     private function getAvailablePlans(): array

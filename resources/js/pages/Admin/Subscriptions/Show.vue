@@ -120,12 +120,20 @@ const breadcrumbs: BreadcrumbItem[] = [
                 <h2 class="text-xl font-semibold text-gray-900">
                     Subscription Details
                 </h2>
-                <Link
-                    :href="route('admin.subscriptions.index')"
-                    class="inline-flex items-center px-4 py-2 bg-white border border-gray-300 rounded-md font-semibold text-xs text-gray-700 uppercase tracking-widest hover:bg-gray-50"
-                >
-                    Back to List
-                </Link>
+                <div class="flex space-x-2">
+                    <Link
+                        :href="route('admin.subscriptions.edit', { id: subscription.id })"
+                        class="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
+                    >
+                        Edit Subscription
+                    </Link>
+                    <Link
+                        :href="route('admin.subscriptions.index')"
+                        class="inline-flex items-center px-4 py-2 bg-white border border-gray-300 rounded-md font-semibold text-xs text-gray-700 uppercase tracking-widest hover:bg-gray-50"
+                    >
+                        Back to List
+                    </Link>
+                </div>
             </div>
         </template>
 

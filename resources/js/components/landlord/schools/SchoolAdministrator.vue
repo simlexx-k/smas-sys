@@ -9,6 +9,9 @@ interface Props {
             created_at: string;
             updated_at: string;
         };
+        logo_url?: string;
+        name: string;
+        domain: string;
     };
 }
 
@@ -22,6 +25,11 @@ const formatDate = (date: string | null) => {
         day: 'numeric'
     });
 };
+
+const getInitials = (name: string) => {
+    const names = name.split(' ');
+    return names.map(n => n.charAt(0).toUpperCase()).join('');
+};
 </script>
 
 <template>
@@ -30,10 +38,24 @@ const formatDate = (date: string | null) => {
         <div class="bg-white shadow sm:rounded-lg">
             <div class="px-4 py-5 sm:p-6">
                 <div class="sm:flex sm:items-start sm:justify-between">
-                    <div>
-                        <h3 class="text-lg font-medium leading-6 text-gray-900">School Administrator</h3>
-                        <div class="mt-2 max-w-xl text-sm text-gray-500">
-                            <p>Administrator account details and permissions.</p>
+                    <div class="flex items-center space-x-4">
+                        <div class="flex-shrink-0 h-12 w-12">
+                            <img 
+                                v-if="tenant.logo_url"
+                                :src="tenant.logo_url"
+                                class="h-12 w-12 rounded-full"
+                                :alt="tenant.name"
+                            >
+                            <span 
+                                v-else
+                                class="inline-block h-12 w-12 rounded-full bg-gray-100 text-gray-500 flex items-center justify-center"
+                            >
+                                {{ getInitials(tenant.name) }}
+                            </span>
+                        </div>
+                        <div>
+                            <h3 class="text-lg font-medium leading-6 text-gray-900">{{ tenant.name }}</h3>
+                            <p class="mt-1 text-sm text-gray-500">{{ tenant.domain }}</p>
                         </div>
                     </div>
                     <div class="mt-5 sm:mt-0 sm:ml-6 sm:flex sm:flex-shrink-0 sm:items-center space-x-3">

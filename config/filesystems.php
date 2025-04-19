@@ -60,6 +60,21 @@ return [
             'report' => false,
         ],
 
+        'tenant' => [
+            'driver' => 'local',
+            'root' => storage_path('app/tenants'),
+            'url' => env('APP_URL').'/storage/tenants',
+            'visibility' => 'public',
+        ],
+
+        'invoices' => [
+            'driver' => 'local',
+            'root' => storage_path('app/invoices'),
+            'url' => env('APP_URL').'/invoices',
+            'visibility' => 'private',
+            'throw' => false,
+        ],
+
     ],
 
     /*

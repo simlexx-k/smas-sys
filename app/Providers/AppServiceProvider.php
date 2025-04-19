@@ -5,6 +5,7 @@ namespace App\Providers;
 use Illuminate\Support\ServiceProvider;
 use App\Models\Activity;
 use App\Observers\ActivityObserver;
+use App\Services\StorageUsageService;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -13,7 +14,9 @@ class AppServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
-        //
+        $this->app->singleton(StorageUsageService::class, function ($app) {
+            return new StorageUsageService();
+        });
     }
 
     /**

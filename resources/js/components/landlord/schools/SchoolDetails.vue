@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { Link } from '@inertiajs/vue3';
+import { onMounted } from 'vue';
 
 interface Props {
     tenant: {
@@ -24,6 +25,12 @@ interface Props {
             payment_method: string;
             last_payment_at: string | null;
             next_payment_at: string | null;
+            plan?: {
+                name: string;
+                billing_period: string;
+                price: string;
+                features: string[];
+            };
         };
         admin?: {
             id: number;
@@ -47,6 +54,7 @@ interface Props {
             domain: string;
             admin_email: string;
             is_active: boolean;
+            user_count: number;
         };
     };
 }
@@ -70,6 +78,53 @@ const parseFeatures = (features: string | undefined) => {
         return [];
     }
 };
+
+const getInitials = (name: string) => {
+    return name.split(' ').map(word => word[0]).join('');
+};
+
+const statusColor = (status) => {
+    const colors = {
+        active: 'bg-green-100 text-green-800',
+        trial: 'bg-blue-100 text-blue-800',
+        canceled: 'bg-yellow-100 text-yellow-800',
+        expired: 'bg-red-100 text-red-800',
+        expiring_soon: 'bg-orange-100 text-orange-800'
+    };
+    return colors[status] || 'bg-gray-100 text-gray-800';
+};
+
+const formatStatus = (status) => {
+    const statusMap = {
+        active: 'Active',
+        trial: 'Trial',
+        canceled: 'Canceled',
+        expired: 'Expired',
+        expiring_soon: 'Expiring Soon'
+    };
+    return statusMap[status] || 'Unknown';
+};
+
+onMounted(() => {
+    // Safe JSON logging
+    console.log('Full Tenant Data:', props.tenant);
+    console.log('Raw Subscription Data:', props.tenant.subscription);
+    
+    if(props.tenant.subscription) {
+        console.log('Parsed Subscription:', JSON.parse(JSON.stringify(props.tenant.subscription)));
+        console.log('Plan Features:', 
+            Array.isArray(props.tenant.subscription.plan?.features) 
+                ? props.tenant.subscription.plan.features 
+                : 'Invalid features format'
+        );
+    } else {
+        console.log('No subscription found');
+    }
+    
+    // Simplified relationship check
+    console.log('Subscription exists:', !!props.tenant.subscription);
+    console.log('Plan exists:', !!props.tenant.subscription?.plan);
+});
 </script>
 
 <template>
@@ -88,7 +143,7 @@ const parseFeatures = (features: string | undefined) => {
                             <dl>
                                 <dt class="text-sm font-medium text-gray-500 truncate">Active Users</dt>
                                 <dd class="flex items-baseline">
-                                    <div class="text-2xl font-semibold text-gray-900">0</div>
+                                    <div class="text-2xl font-semibold text-gray-900">{{ stats.tenant.user_count }}</div>
                                 </dd>
                             </dl>
                         </div>
@@ -144,7 +199,10 @@ const parseFeatures = (features: string | undefined) => {
                             </div>
                             <div>
                                 <dt class="text-sm font-medium text-gray-500">Domain</dt>
-                                <dd class="mt-1 text-sm text-gray-900">{{ tenant.domain }}</dd>
+                                <dd class="mt-1 text-sm text-gray-900">
+                                    {{ tenant.domain || 'Not set' }}
+                                    <span v-if="!tenant.domain" class="text-red-500 text-xs">(Missing in database)</span>
+                                </dd>
                             </div>
                             <div>
                                 <dt class="text-sm font-medium text-gray-500">Email</dt>
@@ -152,11 +210,22 @@ const parseFeatures = (features: string | undefined) => {
                             </div>
                             <div>
                                 <dt class="text-sm font-medium text-gray-500">Phone</dt>
-                                <dd class="mt-1 text-sm text-gray-900">{{ tenant.phone }}</dd>
+                                <dd class="mt-1 text-sm text-gray-900">
+                                    {{ tenant.phone || 'Not provided' }}
+                                    <span v-if="!tenant.phone" class="text-red-500 text-xs">(Missing in database)</span>
+                                </dd>
                             </div>
                             <div class="sm:col-span-2">
                                 <dt class="text-sm font-medium text-gray-500">Address</dt>
-                                <dd class="mt-1 text-sm text-gray-900 whitespace-pre-line">{{ tenant.address }}</dd>
+                                <dd class="mt-1 text-sm text-gray-900 whitespace-pre-line">
+                                    <template v-if="tenant.address">
+                                        <span v-html="tenant.address"></span>
+                                    </template>
+                                    <template v-else>
+                                        <span class="text-gray-500">No address available</span>
+                                        <span class="text-red-500 text-xs block">(Missing in database)</span>
+                                    </template>
+                                </dd>
                             </div>
                             <div>
                                 <dt class="text-sm font-medium text-gray-500">School Type</dt>
@@ -179,7 +248,21 @@ const parseFeatures = (features: string | undefined) => {
                     <dl class="mt-6 grid grid-cols-1 gap-5">
                         <div class="px-4 py-5 bg-gray-50 shadow rounded-lg overflow-hidden sm:p-6">
                             <dt class="text-sm font-medium text-gray-500 truncate">Storage Used</dt>
-                            <dd class="mt-1 text-3xl font-semibold text-gray-900">{{ stats.usage.storage_used }}</dd>
+                            <dd class="mt-1">
+                                <div class="flex items-baseline justify-between">
+                                    <span class="text-3xl font-semibold text-gray-900">{{ stats.usage.storage_used }}</span>
+                                    <span class="ml-2 text-sm font-medium text-gray-500">of 5 GB used</span>
+                                </div>
+                                <div class="mt-2 relative">
+                                    <div class="flex h-2 rounded bg-gray-200 overflow-hidden">
+                                        <div 
+                                            class="bg-indigo-600" 
+                                            :style="{ width: `${(parseFloat(stats.usage.storage_used) / 5120) * 100}%` }"
+                                            aria-label="Storage usage"
+                                        ></div>
+                                    </div>
+                                </div>
+                            </dd>
                         </div>
                         <div class="px-4 py-5 bg-gray-50 shadow rounded-lg overflow-hidden sm:p-6">
                             <dt class="text-sm font-medium text-gray-500 truncate">Total Files</dt>
@@ -187,58 +270,92 @@ const parseFeatures = (features: string | undefined) => {
                         </div>
                         <div class="px-4 py-5 bg-gray-50 shadow rounded-lg overflow-hidden sm:p-6">
                             <dt class="text-sm font-medium text-gray-500 truncate">Last Activity</dt>
-                            <dd class="mt-1 text-lg font-semibold text-gray-900">{{ stats.usage.last_activity }}</dd>
+                            <dd class="mt-1 flex items-center">
+                                <span class="text-lg font-semibold text-gray-900">{{ stats.usage.last_activity }}</span>
+                                <span class="ml-2 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                                    <svg class="mr-1 h-3 w-3" fill="currentColor" viewBox="0 0 8 8">
+                                        <circle cx="4" cy="4" r="3" />
+                                    </svg>
+                                    {{ stats.tenant.is_active ? 'Active' : 'Inactive' }}
+                                </span>
+                            </dd>
                         </div>
                     </dl>
                 </div>
             </div>
 
-            <!-- Subscription Details -->
+            <!-- Subscription Information Card -->
             <div class="lg:col-span-2">
                 <div class="bg-white shadow rounded-lg">
                     <div class="px-4 py-5 sm:px-6">
-                        <h3 class="text-lg font-medium text-gray-900">Subscription Information</h3>
-                        <p class="mt-1 max-w-2xl text-sm text-gray-500">Current subscription plan and billing details.</p>
+                        <h3 class="text-lg font-medium text-gray-900">Subscription Details</h3>
+                        <p class="mt-1 max-w-2xl text-sm text-gray-500">Current plan and billing information</p>
                     </div>
                     <div class="border-t border-gray-200 px-4 py-5 sm:px-6">
                         <dl class="grid grid-cols-1 gap-x-4 gap-y-6 sm:grid-cols-2">
+                            <!-- Plan Name -->
                             <div>
-                                <dt class="text-sm font-medium text-gray-500">Plan</dt>
-                                <dd class="mt-1 text-sm text-gray-900">{{ tenant.subscription_plan }}</dd>
+                                <dt class="text-sm font-medium text-gray-500">Plan Name</dt>
+                                <dd class="mt-1 text-sm text-gray-900">
+                                    {{ tenant.subscription?.plan?.name || 'No active plan' }}
+                                    <span v-if="tenant.subscription?.plan" class="text-gray-500 text-xs block">
+                                        ({{ tenant.subscription_plan }})
+                                    </span>
+                                </dd>
                             </div>
+
+                            <!-- Subscription Status -->
                             <div>
                                 <dt class="text-sm font-medium text-gray-500">Status</dt>
                                 <dd class="mt-1">
                                     <span :class="[
-                                        tenant.subscription?.status === 'active' ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800',
+                                        tenant.subscription?.status === 'active' ? 'bg-green-100 text-green-800' :
+                                        tenant.subscription?.status === 'trial' ? 'bg-blue-100 text-blue-800' :
+                                        'bg-yellow-100 text-yellow-800',
                                         'inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium'
                                     ]">
-                                        {{ tenant.subscription?.status || 'No subscription' }}
+                                        {{ tenant.subscription?.status?.toUpperCase() || 'INACTIVE' }}
                                     </span>
                                 </dd>
                             </div>
+
+                            <!-- Billing Details -->
                             <div>
-                                <dt class="text-sm font-medium text-gray-500">Trial Ends</dt>
-                                <dd class="mt-1 text-sm text-gray-900">{{ formatDate(tenant.subscription?.trial_ends_at) }}</dd>
+                                <dt class="text-sm font-medium text-gray-500">Billing Cycle</dt>
+                                <dd class="mt-1 text-sm text-gray-900">
+                                    {{ tenant.subscription?.plan?.billing_period || 'Monthly' }}
+                                </dd>
                             </div>
-                            <div>
-                                <dt class="text-sm font-medium text-gray-500">Subscription Ends</dt>
-                                <dd class="mt-1 text-sm text-gray-900">{{ formatDate(tenant.subscription?.ends_at) }}</dd>
-                            </div>
+
+                            <!-- Price -->
                             <div>
                                 <dt class="text-sm font-medium text-gray-500">Price</dt>
-                                <dd class="mt-1 text-sm text-gray-900">${{ tenant.subscription?.price || '0.00' }}/month</dd>
+                                <dd class="mt-1 text-sm text-gray-900">
+                                    ${{ Number(tenant.subscription?.price || tenant.subscription?.plan?.price || 0).toFixed(2) }}
+                                </dd>
                             </div>
-                            <div>
-                                <dt class="text-sm font-medium text-gray-500">Payment Method</dt>
-                                <dd class="mt-1 text-sm text-gray-900">{{ tenant.subscription?.payment_method || 'None' }}</dd>
-                            </div>
+
+                            <!-- Subscription Period -->
                             <div class="sm:col-span-2">
-                                <dt class="text-sm font-medium text-gray-500">Features</dt>
+                                <dt class="text-sm font-medium text-gray-500">Subscription Period</dt>
+                                <dd class="mt-1 text-sm text-gray-900">
+                                    {{ formatDate(tenant.subscription?.starts_at) }} 
+                                    - 
+                                    {{ formatDate(tenant.subscription?.ends_at) || 'Ongoing' }}
+                                </dd>
+                            </div>
+
+                            <!-- Plan Features -->
+                            <div class="sm:col-span-2">
+                                <dt class="text-sm font-medium text-gray-500">Included Features</dt>
                                 <dd class="mt-1 text-sm text-gray-900">
                                     <ul class="list-disc pl-5 space-y-1">
-                                        <li v-for="feature in parseFeatures(tenant.subscription?.features)" :key="feature">
+                                        <li v-for="(feature, index) in tenant.subscription?.plan?.features" 
+                                            :key="index">
                                             {{ feature }}
+                                        </li>
+                                        <li v-if="!tenant.subscription?.plan?.features?.length" class="text-gray-500">
+                                            No additional features specified
                                         </li>
                                     </ul>
                                 </dd>
@@ -282,6 +399,84 @@ const parseFeatures = (features: string | undefined) => {
                     </dl>
                 </div>
             </div>
+
+            <!-- Add subscription timeline -->
+            <div class="mt-6 border-t border-gray-200 pt-6">
+                <h4 class="text-sm font-medium text-gray-900 mb-4">Subscription Timeline</h4>
+                <div class="flow-root">
+                    <ul class="-mb-8">
+                        <li>
+                            <div class="relative pb-8">
+                                <div class="relative flex items-start space-x-3">
+                                    <div class="relative">
+                                        <span class="h-8 w-8 rounded-full bg-green-500 flex items-center justify-center">
+                                            <svg class="h-5 w-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+                                            </svg>
+                                        </span>
+                                    </div>
+                                    <div class="min-w-0 flex-1 pt-1.5">
+                                        <div class="text-sm text-gray-500">
+                                            <span class="font-medium text-gray-900">Subscription Started</span>
+                                            {{ formatDate(tenant.subscription?.starts_at) }}
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </li>
+                        <li>
+                            <div class="relative pb-8">
+                                <div class="relative flex items-start space-x-3">
+                                    <div class="relative">
+                                        <span class="h-8 w-8 rounded-full bg-blue-500 flex items-center justify-center">
+                                            <svg class="h-5 w-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                                            </svg>
+                                        </span>
+                                    </div>
+                                    <div class="min-w-0 flex-1 pt-1.5">
+                                        <div class="text-sm text-gray-500">
+                                            <span class="font-medium text-gray-900">Next Payment Due</span>
+                                            {{ formatDate(tenant.subscription?.next_payment_at) || 'N/A' }}
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </li>
+                    </ul>
+                </div>
+            </div>
+
+            <!-- Admin Contact Actions -->
+            <div class="mt-6 border-t border-gray-200 pt-6">
+                <div class="flex space-x-3">
+                    <button 
+                        type="button"
+                        class="inline-flex items-center px-3 py-2 border border-gray-300 shadow-sm text-sm leading-4 font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50"
+                    >
+                        <svg class="mr-2 h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/>
+                        </svg>
+                        Send Message
+                    </button>
+                    <button 
+                        type="button"
+                        class="inline-flex items-center px-3 py-2 border border-gray-300 shadow-sm text-sm leading-4 font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50"
+                    >
+                        <svg class="mr-2 h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/>
+                        </svg>
+                        View Profile
+                    </button>
+                </div>
+            </div>
         </div>
+    </div>
+
+    <!-- Add this at the bottom of the template -->
+    <div v-if="false" class="hidden debug-info">
+        <h3 class="text-red-500 font-bold">Debug Data</h3>
+        <pre>{{ JSON.stringify(tenant, null, 2) }}</pre>
+        <pre>{{ JSON.stringify(stats, null, 2) }}</pre>
     </div>
 </template>

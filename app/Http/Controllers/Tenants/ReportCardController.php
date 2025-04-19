@@ -370,13 +370,17 @@ class ReportCardController extends Controller
             // Get the first report card to access common data
             $firstCard = $reportCards->first();
             
+            // Get all report cards for this exam and class
+            $allReportCards = ReportCard::where('exam_id', $firstCard->exam_id)
+                ->whereHas('student', function($query) use ($firstCard) {
+                    $query->where('school_class_id', $firstCard->student->school_class_id);
+                })
+                ->with(['student', 'subject', 'exam'])
+                ->get();
+
             // Get all subjects for this exam
-            $subjects = Subject::join('report_cards', 'subjects.id', '=', 'report_cards.subject_id')
-                ->where('report_cards.exam_id', $firstCard->exam_id)
-                ->where('report_cards.tenant_id', $firstCard->tenant_id)
-                ->select('subjects.id', 'subjects.name')
-                ->distinct()
-                ->orderBy('subjects.name')
+            $subjects = Subject::whereIn('id', $allReportCards->pluck('subject_id')->unique())
+                ->orderBy('name')
                 ->get();
 
             // Get all students in the class
@@ -384,10 +388,13 @@ class ReportCardController extends Controller
                 ->orderBy('first_name')
                 ->get();
 
-            // Get all scores for these students
+            // Organize scores by student and subject
             $scores = [];
-            foreach ($reportCards as $rc) {
-                $scores[$rc->student_id][$rc->subject_id] = $rc->score;
+            foreach ($allReportCards as $rc) {
+                $scores[$rc->student_id][$rc->subject_id] = [
+                    'score' => $rc->score,
+                    'grade' => $rc->grade
+                ];
             }
 
             // Calculate averages and prepare for sorting

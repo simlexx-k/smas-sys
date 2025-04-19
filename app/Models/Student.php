@@ -69,4 +69,9 @@ class Student extends Model
     {
         return $this->hasMany(ReportCard::class);
     }
+
+    public function scopeForTenant($query)
+    {
+        return $query->where('tenant_id', auth()->user()->tenant_id);
+    }
 }

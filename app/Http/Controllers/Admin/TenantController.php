@@ -86,6 +86,11 @@ class TenantController extends Controller
 
     public function update(Request $request, Tenant $tenant)
     {
+        \Log::channel('tenant')->debug('Tenant update request', [
+            'has_file' => $request->hasFile('logo_path'),
+            'file_valid' => $request->file('logo_path')?->isValid()
+        ]);
+
         $validated = $request->validate([
             'name' => 'required|string|max:255',
             'email' => 'nullable|email|max:255',
@@ -94,6 +99,8 @@ class TenantController extends Controller
             'status' => 'required|in:active,inactive',
             'logo' => 'nullable|image|max:2048'
         ]);
+        
+        \Log::channel('tenant')->debug('Validated data', $validated);
 
         $tenant = $this->tenantService->update($tenant, $validated);
 

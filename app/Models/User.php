@@ -88,6 +88,11 @@ class User extends Authenticatable
         ];
     }
 
+    public function hasAnyRoleCustom(array $roles): bool
+    {
+        return in_array($this->role, $roles);
+    }
+
     /**
      * Boot function from Laravel.
      */

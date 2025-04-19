@@ -12,6 +12,8 @@ interface Props {
         id: number;
         domain: string;
         domains?: Domain[];
+        logo_url?: string;
+        name: string;
     };
 }
 
@@ -32,20 +34,24 @@ const formatDate = (date: string | null) => {
         <!-- Domain List -->
         <div class="bg-white shadow sm:rounded-lg">
             <div class="px-4 py-5 sm:p-6">
-                <div class="sm:flex sm:items-start sm:justify-between">
-                    <div>
-                        <h3 class="text-lg font-medium leading-6 text-gray-900">Domains</h3>
-                        <div class="mt-2 max-w-xl text-sm text-gray-500">
-                            <p>Manage your school's domains and subdomains.</p>
+                <div class="flex items-center space-x-3">
+                    <div class="flex-shrink-0 h-9 w-9">
+                        <img 
+                            v-if="tenant.logo_url"
+                            :src="tenant.logo_url"
+                            class="h-9 w-9 rounded-full"
+                            :alt="tenant.name"
+                        >
+                        <div 
+                            v-else
+                            class="h-9 w-9 rounded-full bg-gray-100 flex items-center justify-center"
+                        >
+                            <GlobeAltIcon class="h-5 w-5 text-gray-400" />
                         </div>
                     </div>
-                    <div class="mt-5 sm:mt-0 sm:ml-6 sm:flex sm:flex-shrink-0 sm:items-center">
-                        <button
-                            type="button"
-                            class="inline-flex items-center rounded-md border border-transparent bg-indigo-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-indigo-700"
-                        >
-                            Add Domain
-                        </button>
+                    <div>
+                        <h3 class="text-base font-medium">Custom Domains</h3>
+                        <p class="text-sm text-gray-500">for {{ tenant.name }}</p>
                     </div>
                 </div>
             </div>

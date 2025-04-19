@@ -78,13 +78,11 @@ const attendanceData = reactive([
 ]);
 
 // Chart Configuration
-const series = ref([{
-  name: 'Present',
-  data: attendanceData.map(d => d.present)
-}, {
-  name: 'Absent',
-  data: attendanceData.map(d => d.absent)
-}]);
+const series = ref([
+  { name: 'Present', data: [] },
+  { name: 'Absent', data: [] },
+  { name: 'Late', data: [] }
+]);
 
 const chartOptions = reactive({
   chart: {
@@ -97,7 +95,7 @@ const chartOptions = reactive({
       }
     }
   },
-  colors: ['#10B981', '#EF4444'],
+  colors: ['#10B981', '#EF4444', '#F59E0B'],
   plotOptions: {
     bar: {
       horizontal: false,
@@ -114,11 +112,12 @@ const chartOptions = reactive({
     colors: ['transparent']
   },
   xaxis: {
-    categories: attendanceData.map(d => new Date(d.date).toLocaleDateString()),
+    type: 'datetime',
     labels: {
-      style: {
-        colors: '#6B7280',
-        fontSize: '12px'
+      formatter: function(value) {
+        return new Date(value).toLocaleDateString('en-US', { 
+          month: 'short', day: 'numeric' 
+        });
       }
     }
   },
@@ -135,8 +134,10 @@ const chartOptions = reactive({
     opacity: 1
   },
   tooltip: {
-    y: {
-      formatter: (val: number) => `${val} students`
+    x: {
+      formatter: (val: number) => new Date(val).toLocaleDateString('en-US', {
+        weekday: 'short', year: 'numeric', month: 'short', day: 'numeric'
+      })
     }
   },
   grid: {
@@ -157,47 +158,34 @@ const chartOptions = reactive({
 const showCSVOptions = ref(false);
 const exportHeaders = ref(true);
 
-const processAttendanceData = (rawData) => {
-  const dateMap = new Map();
-
-  rawData.forEach(record => {
-    const date = record.date;
-    if (!dateMap.has(date)) {
-      dateMap.set(date, { present: 0, absent: 0 });
-    }
-    // Assuming status is stored in record.status
-    if (record.status === 'present') {
-      dateMap.get(date).present++;
-    } else {
-      dateMap.get(date).absent++;
-    }
-  });
-
-  return Array.from(dateMap.entries()).map(([date, counts]) => ({
-    date,
-    ...counts
-  }));
-};
-
 const fetchAttendanceData = async () => {
   try {
     const response = await axios.get('/api/attendances');
-    console.log('Fetched attendance data:', response.data);
+    const processedData = response.data.map(d => ({
+      ...d,
+      date: new Date(d.date).getTime() // Convert to timestamp for apexcharts
+    }));
 
-    const processedData = processAttendanceData(response.data.data);
-    attendanceData.splice(0, attendanceData.length, ...processedData);
+    series.value = [
+      { 
+        name: 'Present', 
+        data: processedData.map(d => ({ x: d.date, y: d.present })) 
+      },
+      { 
+        name: 'Absent', 
+        data: processedData.map(d => ({ x: d.date, y: d.absent })) 
+      },
+      { 
+        name: 'Late', 
+        data: processedData.map(d => ({ x: d.date, y: d.late })) 
+      }
+    ];
 
-    series.value = [{
-      name: 'Present',
-      data: processedData.map(d => d.present)
-    }, {
-      name: 'Absent',
-      data: processedData.map(d => d.absent)
-    }];
-
-    chartOptions.xaxis.categories = processedData.map(d => new Date(d.date).toLocaleDateString());
+    chartOptions.xaxis.categories = processedData.map(d => d.date);
+    
   } catch (error) {
     toast.error('Failed to fetch attendance data');
+    console.error('Error:', error);
   }
 };
 
@@ -223,9 +211,9 @@ const exportAsCSV = () => {
 
 const confirmCSVExport = () => {
   const csvContent = [
-    exportHeaders.value ? 'Date,Present,Absent' : '',
+    exportHeaders.value ? 'Date,Present,Absent,Late' : '',
     ...attendanceData.map(d => 
-      `${d.date},${d.present},${d.absent}`
+      `${d.date},${d.present},${d.absent},${d.late}`
     )
   ].join('\n');
 
