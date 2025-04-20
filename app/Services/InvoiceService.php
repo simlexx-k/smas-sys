@@ -9,14 +9,28 @@ use Illuminate\Support\Str;
 
 class InvoiceService
 {
-    public function generatePdf(Invoice $invoice)
+    public function generatePdf(Invoice $invoice): string
     {
         try {
             // Load relationships
             $invoice->load(['subscription.plan', 'tenant']);
 
+            $data = [
+                'invoice' => $invoice->toArray(),
+                'tenant' => $invoice->tenant->toArray(),
+                'subscription' => $invoice->subscription->toArray(),
+                'plan' => $invoice->subscription->plan->toArray()
+            ];
+            
+            // Add validation
+            throw_unless(
+                is_string($data['plan']['name']), 
+                \Exception::class, 
+                'Invalid plan name type'
+            );
+
             $filename = 'invoice-'.$invoice->id.'-'.Str::random(8).'.pdf';
-            $storagePath = "invoices/{$filename}";
+            $storagePath = $filename;
 
             $pdf = Pdf::loadView('pdf.invoice', [
                 'invoice' => $invoice,

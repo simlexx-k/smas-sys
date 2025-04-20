@@ -156,4 +156,12 @@ return [
         App\Providers\RouteServiceProvider::class,
     ],
 
+    'currency_symbol' => 'Ksh',
+    'vat_number' => 'P00123456789',
+    'address' => "123 Business Street\nNairobi, Kenya\nPostcode",
+    'payment_instructions' => "Bank: Equity Bank\nAccount: 12345678\nIBAN: GB00 EXMP 1234 5678 9012 34",
+    'currency_name' => 'Kenyan Shillings',
+    'phone' => '+254 700 000 000',
+    'logo' => '/path/to/company-logo.png',
+
 ];

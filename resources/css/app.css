@@ -120,3 +120,7 @@ html {
         @apply font-display;
     }
 }
+
+.Vue-Toastification__container {
+    z-index: 9999 !important;
+}

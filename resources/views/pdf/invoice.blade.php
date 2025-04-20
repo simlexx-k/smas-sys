@@ -3,278 +3,232 @@
 <head>
     <meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>
     <title>Invoice {{ $invoice->number }}</title>
-    <link href="https://fonts.googleapis.com/css2?family=Ubuntu:wght@300;400;500;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <style>
         :root {
-            --primary-color: #3B82F6;
-            --secondary-color: #64748B;
-            --success-color: #10B981;
-            --border-color: #E2E8F0;
-            --accent-color: #7C3AED;
+            --primary: #1E293B;
+            --secondary: #64748B;
+            --accent: #6366F1;
+            --success: #16A34A;
+            --danger: #DC2626;
+            --border: #E2E8F0;
+            --bg-light: #F8FAFC;
         }
         
         body {
-            font-family: 'Ubuntu', sans-serif;
-            color: #1E293B;
+            font-family: 'Inter', sans-serif;
+            color: var(--primary);
             line-height: 1.5;
             margin: 0;
-            padding: 2.5cm;
+            padding: 40px 50px;
         }
-        
+
         .header {
             display: flex;
             justify-content: space-between;
-            align-items: flex-start;
-            margin-bottom: 2rem;
-            padding-bottom: 1.5rem;
-            border-bottom: 2px solid var(--primary-color);
+            margin-bottom: 2.5rem;
         }
-        
-        .logo-section {
-            width: 30%;
+
+        .company-info {
+            max-width: 300px;
         }
-        
-        .logo {
-            max-width: 180px;
-            height: auto;
-            margin-bottom: 1rem;
-        }
-        
-        .invoice-info {
+
+        .invoice-meta {
             text-align: right;
         }
-        
-        .invoice-number {
-            font-size: 1.8rem;
-            font-weight: 700;
-            color: var(--primary-color);
-            margin: 0 0 0.5rem 0;
-        }
-        
-        .invoice-dates {
-            font-size: 0.9rem;
-            color: var(--secondary-color);
-        }
-        
-        .billing-grid {
+
+        .grid-2 {
             display: grid;
             grid-template-columns: repeat(2, 1fr);
             gap: 2rem;
             margin: 2rem 0;
-            padding: 1.5rem;
-            background: #F8FAFC;
-            border-radius: 12px;
         }
-        
-        .billing-section h3 {
+
+        .badge {
+            display: inline-block;
+            padding: 0.35rem 0.8rem;
+            border-radius: 6px;
             font-weight: 500;
-            color: var(--accent-color);
-            margin: 0 0 1rem 0;
-            font-size: 1.1rem;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
+            font-size: 0.875rem;
         }
-        
-        .items-table {
+
+        .table {
             width: 100%;
             border-collapse: collapse;
             margin: 2rem 0;
-            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
         }
-        
-        .items-table th {
-            background: var(--primary-color);
-            color: white;
-            padding: 1rem;
+
+        .table th {
+            background: var(--bg-light);
             text-align: left;
-            font-weight: 500;
-            font-size: 0.9rem;
+            padding: 1rem;
+            font-weight: 600;
+            font-size: 0.875rem;
         }
-        
-        .items-table td {
-            padding: 1.2rem;
-            border-bottom: 1px solid var(--border-color);
-            font-size: 0.95rem;
+
+        .table td {
+            padding: 1rem;
+            border-bottom: 1px solid var(--border);
         }
-        
-        .items-table tr:last-child td {
-            border-bottom: none;
-        }
-        
-        .amount-cell {
-            text-align: right;
-            font-weight: 500;
-        }
-        
-        .total-section {
-            background: var(--primary-color);
-            color: white;
-            padding: 1.5rem;
+
+        .total-card {
+            background: var(--bg-light);
             border-radius: 8px;
-            margin: 2rem 0;
-        }
-        
-        .total-row {
-            display: flex;
-            justify-content: space-between;
-            margin: 0.5rem 0;
-            font-size: 1rem;
-        }
-        
-        .total-label {
-            font-weight: 300;
-        }
-        
-        .total-amount {
-            font-weight: 700;
-            font-size: 1.2rem;
-        }
-        
-        .payment-instructions {
-            margin: 2rem 0;
             padding: 1.5rem;
-            background: #F0FDFA;
-            border-left: 4px solid var(--success-color);
-            border-radius: 6px;
+            max-width: 320px;
+            margin-left: auto;
         }
-        
+
         .footer {
             margin-top: 3rem;
             padding-top: 2rem;
-            border-top: 1px solid var(--border-color);
-            text-align: center;
-            font-size: 0.8rem;
-            color: var(--secondary-color);
+            border-top: 1px solid var(--border);
+            font-size: 0.875rem;
+            color: var(--secondary);
         }
-        
-        .status-badge {
-            display: inline-block;
-            padding: 0.3rem 0.8rem;
-            border-radius: 20px;
-            font-weight: 500;
-            font-size: 0.8rem;
+
+        .text-right {
+            text-align: right;
         }
-        
-        .status-paid {
-            background: var(--success-color);
-            color: white;
+
+        .text-danger {
+            color: var(--danger);
         }
-        
-        .status-pending {
-            background: #F59E0B;
-            color: white;
+
+        .text-success {
+            color: var(--success);
+        }
+
+        .currency {
+            font-family: monospace;
         }
     </style>
 </head>
 <body>
     <div class="header">
-        <div class="logo-section">
-            <div class="company-info">
-                <h1 style="margin: 0 0 0.5rem 0; color: var(--primary-color); font-size: 1.8rem">
-                    {{ config('app.name') }}
-                </h1>
-                <p style="margin: 0.2rem 0; font-size: 0.9rem; color: var(--secondary-color)">
-                    123 Education Street<br>
-                    Tech City, TC 12345<br>
-                    support@smas.com<br>
-                    Reg. No: 123-456-789 | Tax ID: 987654321
-                </p>
+        <div class="company-info">
+            @if(config('app.logo'))
+                <img src="{{ config('app.logo') }}" style="height: 48px; margin-bottom: 1rem;" alt="Logo">
+            @endif
+            <div style="color: var(--secondary); font-size: 0.875rem; margin-top: 0.5rem;">
+                {!! nl2br(e(config('app.address'))) !!}<br>
+                VAT: {{ config('app.vat_number') }}<br>
+                Tel: {{ config('app.phone') }}
             </div>
         </div>
-        
-        <div class="invoice-info">
-            <h1 class="invoice-number">INVOICE {{ $invoice->number }}</h1>
-            <div class="invoice-dates">
-                <p style="margin: 0.3rem 0">
-                    <strong>Issued:</strong> {{ $invoice->created_at->format('M j, Y') }}<br>
-                    <strong>Due:</strong> {{ $invoice->due_date->format('M j, Y') }}
-                </p>
-                <div class="status-badge status-{{ strtolower($invoice->status) }}">
-                    {{ ucfirst($invoice->status) }}
+
+        <div class="invoice-meta">
+            <h1 style="margin: 0 0 0.5rem 0; font-size: 2rem; color: var(--accent);">INVOICE</h1>
+            <div style="font-size: 0.875rem;">
+                <div style="margin-bottom: 0.25rem;">
+                    <span style="color: var(--secondary);">Number:</span> 
+                    <strong>{{ $invoice->number }}</strong>
+                </div>
+                <div style="margin-bottom: 0.25rem;">
+                    <span style="color: var(--secondary);">Issued:</span> 
+                    {{ $invoice->created_at->format('M j, Y') }}
+                </div>
+                <div style="margin-bottom: 0.5rem;">
+                    <span style="color: var(--secondary);">Due:</span> 
+                    <span style="color: {{ $invoice->isOverdue ? 'var(--danger)' : 'inherit' }};">
+                        {{ $invoice->due_date->format('M j, Y') }}
+                    </span>
+                </div>
+                <span class="badge" style="background-color: {{ $invoice->status === 'paid' ? '#DCFCE7' : '#FEE2E2' }}; color: {{ $invoice->status === 'paid' ? '#166534' : '#991B1B' }};">
+                    {{ strtoupper($invoice->status) }}
+                </span>
+            </div>
+        </div>
+    </div>
+
+    <div class="grid-2">
+        <div>
+            <div style="font-size: 0.875rem; margin-bottom: 1rem;">
+                <h3 style="margin: 0 0 0.5rem 0; font-size: 1rem; color: var(--accent);">Bill to</h3>
+                <div style="line-height: 1.6;">
+                    <strong>{{ $tenant->name }}</strong><br>
+                    @if($tenant->address)
+                        {!! nl2br(e($tenant->address)) !!}
+                    @else
+                        <span class="text-danger">No billing address provided</span>
+                    @endif
+                </div>
+            </div>
+        </div>
+
+        <div>
+            <div style="font-size: 0.875rem;">
+                <h3 style="margin: 0 0 0.5rem 0; font-size: 1rem; color: var(--accent);">Subscription Details</h3>
+                <div style="line-height: 1.6;">
+                    <div><strong>Plan:</strong> {{ $subscription->plan->name }}</div>
+                    <div><strong>Billing Cycle:</strong> {{ ucfirst($subscription->plan->billing_period) }}</div>
+                    <div><strong>Price:</strong> @currency($subscription->plan->price)</div>
+                    @if($subscription->trial_ends_at)
+                        <div><strong>Trial Ends:</strong> {{ $subscription->trial_ends_at->format('M j, Y') }}</div>
+                    @endif
                 </div>
             </div>
         </div>
     </div>
 
-    <div class="billing-grid">
-        <div class="billing-section">
-            <h3>From</h3>
-            <p style="margin: 0.5rem 0; line-height: 1.4">
-                {{ config('app.name') }}<br>
-                Reg. No: 123-456-789<br>
-                Tax ID: 987654321
-            </p>
-        </div>
-        
-        <div class="billing-section">
-            <h3>To</h3>
-            <p style="margin: 0.5rem 0; line-height: 1.4">
-                <strong>{{ $tenant->name }}</strong><br>
-                {{ $tenant->address }}<br>
-                {{ $tenant->email }}<br>
-                {{ $tenant->phone }}
-            </p>
-        </div>
-    </div>
-
-    <table class="items-table">
+    <table class="table">
         <thead>
             <tr>
                 <th>Description</th>
-                <th>Period</th>
-                <th style="text-align: right">Amount</th>
+                <th class="text-right">Qty</th>
+                <th class="text-right">Unit Price</th>
+                <th class="text-right">Tax</th>
+                <th class="text-right">Amount</th>
             </tr>
         </thead>
         <tbody>
+            @forelse($invoice->items as $item)
             <tr>
                 <td>
-                    <div style="font-weight: 500">{{ $plan->name }} Subscription</div>
-                    <div style="font-size: 0.9rem; color: var(--secondary-color)">
-                        {{ $plan->description }}
-                    </div>
+                    {{ $subscription->plan->name }} - 
+                    {{ $invoice->billing_period_start->format('M Y') }}
+                    @if($subscription->plan->billing_period)
+                        ({{ ucfirst($subscription->plan->billing_period) }})
+                    @endif
                 </td>
-                <td>
-                    {{ $invoice->billing_period_start->format('M j') }} - 
-                    {{ $invoice->billing_period_end->format('M j, Y') }}
-                </td>
-                <td class="amount-cell">${{ number_format($invoice->subtotal, 2) }}</td>
+                <td class="text-right">1.00</td>
+                <td class="text-right currency">@currency($subscription->plan->price)</td>
+                <td class="text-right">{{ number_format($invoice->tax_rate, 1) }}%</td>
+                <td class="text-right currency">@currency($subscription->plan->price)</td>
             </tr>
+            @empty
+            <tr>
+                <td colspan="5" class="text-center text-danger" style="padding: 1.5rem;">No items found</td>
+            </tr>
+            @endforelse
         </tbody>
     </table>
 
-    <div class="total-section">
-        <div class="total-row">
-            <span class="total-label">Subtotal</span>
-            <span>${{ number_format($invoice->subtotal, 2) }}</span>
+    <div class="total-card">
+        <div style="display: flex; justify-content: space-between; margin-bottom: 0.75rem;">
+            <span>Subtotal:</span>
+            <span class="currency">@currency($invoice->subtotal)</span>
         </div>
-        @if($invoice->tax_amount > 0)
-        <div class="total-row">
-            <span class="total-label">Tax ({{ $invoice->tax_rate }}%)</span>
-            <span>${{ number_format($invoice->tax_amount, 2) }}</span>
+        <div style="display: flex; justify-content: space-between; margin-bottom: 0.75rem;">
+            <span>Tax ({{ number_format($invoice->tax_rate, 1) }}%):</span>
+            <span class="currency">@currency($invoice->tax_amount)</span>
         </div>
-        @endif
-        <div class="total-row" style="margin-top: 1rem">
-            <span class="total-label" style="font-weight: 600">Total Due</span>
-            <span class="total-amount">${{ number_format($invoice->total, 2) }}</span>
+        <div style="display: flex; justify-content: space-between; font-weight: 600; padding-top: 0.75rem; border-top: 1px solid var(--border);">
+            <span>Total Due:</span>
+            <span class="currency">@currency($invoice->total)</span>
         </div>
-    </div>
-
-    <div class="payment-instructions">
-        <h3 style="margin: 0 0 1rem 0; font-size: 1rem">Payment Instructions</h3>
-        <p style="margin: 0.5rem 0; font-size: 0.9rem">
-            Bank Transfer:<br>
-            <strong>Account:</strong> 1234 5678 9012<br>
-            <strong>Routing:</strong> 021000021<br>
-            <strong>Reference:</strong> {{ $invoice->number }}
-        </p>
     </div>
 
     <div class="footer">
-        <p style="margin: 0.5rem 0">
-            Need help? Contact support@smas.com<br>
-            &copy; {{ date('Y') }} {{ config('app.name') }}. All rights reserved.<br>
-            This is an automatically generated invoice
-        </p>
+        <div style="margin-bottom: 1rem;">
+            <h4 style="margin: 0 0 0.5rem 0; color: var(--accent);">Payment Instructions</h4>
+            <div style="white-space: pre-line;">{!! nl2br(e(config('app.payment_instructions'))) !!}</div>
+        </div>
+        <div style="text-align: center; margin-top: 2rem;">
+            {{ config('app.name') }} is a registered company in Kenya • 
+            All amounts in {{ config('app.currency_name') }} ({{ config('app.currency_symbol') }}) • 
+            Invoice generated: {{ now()->format('M j, Y H:i') }}
+        </div>
     </div>
 </body>
 </html>

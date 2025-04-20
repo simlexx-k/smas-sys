@@ -52,6 +52,12 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
     // Existing Landlord (super admin) routes
     Route::middleware(['role:landlord'])->prefix('admin')->name('admin.')->group(function () {
+        Route::get('tenants/{tenant}/invoices/{invoice}/download', 
+            [InvoiceController::class, 'download'])
+            ->name('admin.tenants.invoices.download')
+            ->whereNumber(['tenant', 'invoice'])
+            ->middleware(['auth', 'can:download,invoice']);
+
         Route::get('tenants/trash', [LandlordTenantController::class, 'trash'])
             ->name('tenants.trash');
 
@@ -110,10 +116,6 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::delete('/tenants/{tenant}', [LandlordTenantController::class, 'destroy'])
             ->name('tenants.destroy');
 
-        // Invoice routes
-        Route::get('invoices/{invoice}/download', [InvoiceController::class, 'download'])
-            ->name('invoices.download');
-
         // Add this before the resource route to handle edit view
         Route::get('admin/subscriptions/{subscription}/edit', [\App\Http\Controllers\Admin\SubscriptionController::class, 'edit'])
             ->name('admin.subscriptions.edit');
@@ -123,9 +125,15 @@ Route::middleware(['auth', 'verified'])->group(function () {
             ->except(['create', 'show', 'destroy']);
 
         // Correct invoice generation route
-        Route::post('tenants/{tenant}/invoices/{invoice}/generate-pdf', 
-            [InvoiceController::class, 'generatePdf'])
-            ->name('admin.tenants.invoices.generate-pdf');
+        Route::post('/invoices/{invoice}/generate-pdf', [InvoiceController::class, 'generatePdf'])
+            ->middleware(['auth', 'can:generate,App\Models\Invoice'])
+            ->name('invoices.generate-pdf');
+
+        // Add this invoice route inside the admin group
+        Route::post('tenants/{tenant}/invoices/{invoice}/generate-pdf', [InvoiceController::class, 'generatePdf'])
+            ->middleware(['auth', 'can:generate,invoice'])
+            ->name('tenants.invoices.generate-pdf')
+            ->whereNumber(['tenant', 'invoice']);
     });
 
     // Tenant admin routes
@@ -217,6 +225,20 @@ Route::get('/admin/plans/active', function () {
             ->get()
     );
 })->name('admin.plans.active');
+
+// Add this temporary route ABOVE all others
+Route::get('/invoices/{filename}', function ($filename) {
+    $path = storage_path('app/invoices/'.$filename);
+    
+    if (!file_exists($path)) {
+        abort(404);
+    }
+
+    return response()->download($path, $filename, [
+        'Content-Type' => 'application/pdf',
+        'Cache-Control' => 'no-store, max-age=0'
+    ]);
+})->where('filename', '.*\.pdf$');
 
 require __DIR__.'/settings.php';
 require __DIR__.'/auth.php';

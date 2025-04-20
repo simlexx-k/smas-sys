@@ -33,8 +33,10 @@ createInertiaApp({
         app.use(plugin)
             .use(ZiggyVue)
             .use(Toast, {
-                position: 'top-right',
-                timeout: 3000,
+                container: document.body,
+                transition: 'Vue-Toastification__fade',
+                maxToasts: 5,
+                newestOnTop: true
             })
             .use(VueApexCharts);
 

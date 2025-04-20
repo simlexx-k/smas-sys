@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use App\Traits\LogsActivity;
+use App\Models\InvoiceItem;
 
 class Invoice extends Model
 {
@@ -51,6 +52,8 @@ class Invoice extends Model
         'file_path' => '',
     ];
 
+    protected $appends = ['billing_period_days'];
+
     public function subscription()
     {
         return $this->belongsTo(Subscription::class)->with(['plan', 'tenant']);
@@ -59,6 +62,11 @@ class Invoice extends Model
     public function tenant()
     {
         return $this->belongsTo(Tenant::class)->withTrashed();
+    }
+
+    public function items()
+    {
+        return $this->hasMany(InvoiceItem::class);
     }
 
     public static function generateNumber(): string
@@ -80,5 +88,10 @@ class Invoice extends Model
             'sent_to' => $tenant->admin->email,
             'send_attempts' => $this->send_attempts + 1
         ]);
+    }
+
+    public function getBillingPeriodDaysAttribute(): int
+    {
+        return $this->billing_period_start->diffInDays($this->billing_period_end);
     }
 } 

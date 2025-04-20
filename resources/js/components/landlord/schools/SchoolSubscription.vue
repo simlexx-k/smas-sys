@@ -16,6 +16,7 @@ interface Invoice {
     total: string;
     generated_at?: string;
     error?: boolean;
+    file_path?: string;
 }
 
 interface Subscription {
@@ -90,6 +91,8 @@ const getStatusColor = (status: string) => {
 };
 
 const generatePdf = async (invoiceId) => {
+    console.log('Attempting PDF generation for invoice:', invoiceId);
+    
     try {
         if (!props.tenant?.id) {
             throw new Error('Tenant ID is missing in component props');
@@ -104,31 +107,47 @@ const generatePdf = async (invoiceId) => {
             { headers: { 'Content-Type': 'application/json' } }
         );
 
+        console.log('API Response:', {
+            status: response.status,
+            data: response.data,
+            headers: response.headers
+        });
+
         if (response.data.success) {
-            toast.success('PDF generated successfully');
-            // Force reactive update
-            const updatedInvoices = props.tenant.subscription?.invoices.map(invoice => {
-                if (invoice.id === invoiceId) {
-                    return Object.assign({}, invoice, response.data.invoice, { error: false });
-                }
-                return invoice;
-            }) || [];
-            
-            if (props.tenant.subscription) {
-                props.tenant.subscription.invoices = [...updatedInvoices];
+            console.log('Updating invoice:', invoiceId, 'with data:', response.data.invoice);
+            // Force reactive update using Vue.set
+            const index = props.tenant.subscription.invoices.findIndex(inv => inv.id === invoiceId);
+            if (index !== -1) {
+                const updatedInvoice = {
+                    ...response.data.invoice,
+                    error: false
+                };
+                
+                // Use Vue.set for array item change detection
+                props.tenant.subscription.invoices.splice(index, 1, updatedInvoice);
             }
+
+            toast.success('PDF generated successfully');
+
+            console.log('Invoice array after update:', props.tenant.subscription.invoices);
         }
 
     } catch (error) {
-        toast.error('PDF generation failed: ' + (error.response?.data?.message || error.message));
-        // Update local error state
-        const updatedInvoices = props.tenant.subscription?.invoices.map(inv => 
-            inv.id === invoiceId ? { ...inv, error: true } : inv
-        ) || [];
-        
-        if (props.tenant.subscription) {
-            props.tenant.subscription.invoices = updatedInvoices;
+        console.error('PDF Generation Error:', {
+            error: error.response ? error.response.data : error.message,
+            config: error.config,
+            stack: error.stack
+        });
+        const index = props.tenant.subscription.invoices.findIndex(inv => inv.id === invoiceId);
+        if (index !== -1) {
+            const updatedInvoice = {
+                ...props.tenant.subscription.invoices[index],
+                error: true
+            };
+            
+            props.tenant.subscription.invoices.splice(index, 1, updatedInvoice);
         }
+        toast.error('Generation failed');
     } finally {
         generatingPdf.value = null;
     }
@@ -151,10 +170,23 @@ const sendInvoice = async (invoiceId) => {
         );
 
         if (response.data.success) {
-            toast.success('Invoice sent to tenant admin');
+            toast.success('Invoice sent to tenant admin', {
+                timeout: 3000,
+                closeOnClick: true,
+            });
         }
     } catch (error) {
-        toast.error('Failed to send invoice: ' + (error.response?.data?.message || error.message));
+        toast.error('Failed to send invoice: ' + (error.response?.data?.message || error.message), {
+            timeout: 5000,
+            closeOnClick: true,
+        });
+    }
+};
+
+const downloadPdf = (invoice) => {
+    if (invoice.file_path) {
+        // Temporary direct access
+        window.open(`${import.meta.env.VITE_API_URL}/invoices/${invoice.file_path}`, '_blank');
     }
 };
 
@@ -310,13 +342,12 @@ console.log('Invoices count:', props.tenant.subscription?.invoices?.length);
                                             <template v-else>
                                                 <!-- Successful Generation -->
                                                 <template v-if="invoice.generated_at && !invoice.error">
-                                                    <a
-                                                        :href="`${apiUrl}/admin/invoices/${invoice.id}/download`"
+                                                    <button
+                                                        @click="downloadPdf(invoice)"
                                                         class="text-indigo-600 hover:text-indigo-900"
-                                                        target="_blank"
                                                     >
                                                         Download
-                                                    </a>
+                                                    </button>
                                                     <button
                                                         @click="generatePdf(invoice.id)"
                                                         class="text-yellow-600 hover:text-yellow-900"
@@ -423,13 +454,12 @@ console.log('Invoices count:', props.tenant.subscription?.invoices?.length);
                                             </div>
                                         </td>
                                         <td class="relative whitespace-nowrap py-4 pl-3 pr-4 text-right text-sm font-medium sm:pr-6">
-                                            <a 
-                                                :href="`${apiUrl}/admin/invoices/${invoice.id}/download`"
+                                            <button
+                                                @click="downloadPdf(invoice)"
                                                 class="text-indigo-600 hover:text-indigo-900"
-                                                target="_blank"
                                             >
-                                                Download PDF
-                                            </a>
+                                                Download
+                                            </button>
                                         </td>
                                     </tr>
                                 </tbody>

@@ -11,9 +11,12 @@ use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use App\Models\Tenant;
 use App\Services\InvoiceService;
+use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 
 class InvoiceController extends Controller
 {
+    use AuthorizesRequests;
+
     protected $invoiceService;
 
     public function __construct(InvoiceService $invoiceService)
@@ -21,25 +24,25 @@ class InvoiceController extends Controller
         $this->invoiceService = $invoiceService;
     }
 
-    public function download(Invoice $invoice)
+    public function download(Tenant $tenant, Invoice $invoice)
     {
-        // Add relationship loading
-        $invoice->load(['subscription.plan', 'tenant']);
-        
-        // Verify file existence first
-        if (!Storage::disk('invoices')->exists($invoice->file_path)) {
-            $invoice->update([
-                'generated_at' => null,
-                'error' => true
-            ]);
-            abort(404, 'Invoice PDF not found');
+        // Add relationship validation
+        if ($invoice->tenant_id !== $tenant->id) {
+            abort(403, 'Invoice does not belong to this tenant');
         }
         
-        return Storage::disk('invoices')->download(
-            $invoice->file_path, 
-            "invoice-{$invoice->number}.pdf",
-            ['Cache-Control' => 'no-store, no-cache, must-revalidate']
-        );
+        $invoice->load(['subscription.plan', 'tenant']);
+        
+        if (!$invoice->file_path || !Storage::disk('invoices')->exists($invoice->file_path)) {
+            abort(404, "Invoice file not found at: {$invoice->file_path}");
+        }
+
+        return response()->streamDownload(function () use ($invoice) {
+            echo Storage::disk('invoices')->get($invoice->file_path);
+        }, "invoice-{$invoice->number}.pdf", [
+            'Content-Type' => 'application/pdf',
+            'Cache-Control' => 'no-store, max-age=0'
+        ]);
     }
 
     public function generateForSubscription(Subscription $subscription)
@@ -140,7 +143,14 @@ class InvoiceController extends Controller
 
             return response()->json([
                 'success' => true,
-                'invoice' => $invoice->fresh()->load(['subscription.plan', 'tenant'])
+                'invoice' => [
+                    'id' => $invoice->id,
+                    'generated_at' => $invoice->generated_at->toISOString(),
+                    'file_path' => $invoice->file_path,
+                    'error' => false,
+                    'status' => $invoice->status,
+                    'total' => $invoice->total,
+                ]
             ]);
 
         } catch (\Exception $e) {
@@ -152,25 +162,55 @@ class InvoiceController extends Controller
 
     public function generatePdf(Tenant $tenant, Invoice $invoice)
     {
-        // Validate tenant-invoice relationship
-        if ($invoice->tenant_id !== $tenant->id) {
-            abort(404, 'Invoice does not belong to this tenant');
-        }
-
         try {
-            $pdfPath = $this->invoiceService->generatePdf($invoice);
+            // Load required relationships
+            $invoice->load(['items', 'subscription.plan', 'tenant']);
             
-            return response()->file(
-                storage_path('app/'.$pdfPath),
-                ['Content-Type' => 'application/pdf']
-            );
-            
-        } catch (\Exception $e) {
-            Log::error("PDF Generation Failed", [
+            // Validate tenant-invoice relationship
+            if ($invoice->tenant_id !== $tenant->id) {
+                abort(403, 'Invoice does not belong to this tenant');
+            }
+
+            // Convert model to array with specific fields
+            $logData = [
+                'tenant_id' => $tenant->id,
                 'invoice_id' => $invoice->id,
-                'error' => $e->getMessage()
+                'user_id' => auth()->id(),
+                'amount' => (float)$invoice->amount,
+                'status' => $invoice->status
+            ];
+
+            Log::info('PDF Generation Started', $logData);
+
+            // Generate PDF
+            $pdfPath = $this->invoiceService->generatePdf($invoice);
+
+            // Update invoice with string path
+            $updateData = [
+                'file_path' => (string)$pdfPath,
+                'generated_at' => now(),
+                'error' => false
+            ];
+            
+            $invoice->update($updateData);
+
+            return response()->json([
+                'success' => true,
+                'invoice' => $invoice->fresh()->only([
+                    'id', 'number', 'generated_at', 'file_path', 'total'
+                ])
+            ]);
+
+        } catch (\Exception $e) {
+            Log::error('PDF Generation Failed', [
+                'error' => $e->getMessage(),
+                'trace' => substr($e->getTraceAsString(), 0, 300) // Limit trace length
             ]);
             
+            if ($invoice->exists) {
+                $invoice->update(['error' => true]);
+            }
+
             return response()->json([
                 'error' => 'PDF generation failed: '.$e->getMessage()
             ], 500);

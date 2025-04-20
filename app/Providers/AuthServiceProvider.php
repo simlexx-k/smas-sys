@@ -6,6 +6,8 @@ use Illuminate\Foundation\Support\Providers\AuthServiceProvider as ServiceProvid
 use Illuminate\Support\Facades\Gate;
 use App\Models\Attendance;
 use App\Policies\AttendancePolicy;
+use App\Models\Invoice;
+use App\Policies\InvoicePolicy;
 
 class AuthServiceProvider extends ServiceProvider
 {
@@ -16,6 +18,7 @@ class AuthServiceProvider extends ServiceProvider
      */
     protected $policies = [
         Attendance::class => AttendancePolicy::class,
+        Invoice::class => InvoicePolicy::class,
         // ... other policies ...
     ];
 

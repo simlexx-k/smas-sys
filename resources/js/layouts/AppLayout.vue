@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import AppLayout from '@/layouts/app/AppSidebarLayout.vue';
-import { Toast } from 'vue-toastification';
 import 'vue-toastification/dist/index.css';
 import type { BreadcrumbItemType } from '@/types';
 import { Link } from '@inertiajs/vue3';
@@ -18,18 +17,6 @@ withDefaults(defineProps<Props>(), {
 
 <template>
     <div class="font-sans min-h-screen bg-gray-50">
-        <!-- Toast Container -->
-        <Toast 
-            position="top-right"
-            :timeout="5000"
-            :closeOnClick="true"
-            :pauseOnFocusLoss="true"
-            :pauseOnHover="true"
-            :draggable="true"
-            :draggablePercent="0.6"
-            class="toast-container"
-        />
-        
         <AppLayout :breadcrumbs="breadcrumbs">
             <template #header>
                 <slot name="header" />
